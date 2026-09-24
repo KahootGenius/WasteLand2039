@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -17,12 +18,22 @@ public class HordeEventSpawner : MonoBehaviour
     [Header("行为")]
     public bool autoStart = true;    // 收到事件后是否自动开始
 
+    [Header("测试 / 训练")]
+    [Tooltip("尸潮结束后自动重新开始同一尸潮（用于测试、数据采集和ML训练）。默认关闭，不影响正常游戏")]
+    public bool endlessWaves = false;
+    [Tooltip("无尽模式下两波之间的间隔（秒，受 Time.timeScale 影响）")]
+    public float endlessWaveDelay = 3f;
+
     // 运行时状态
     private HordeEvent currentHordeEvent;
     private bool isSpawning = false;
     private int spawnedCount = 0;
     private float lastSpawnTime = 0f;
     private readonly List<GameObject> activeEnemies = new List<GameObject>();
+    private int completedWaves = 0;
+
+    /// <summary>已完成的尸潮波数（无尽模式下持续累加）</summary>
+    public int CompletedWaves => completedWaves;
 
     // 事件（可选回调）
     public delegate void HordeEventStartedEvent(HordeEvent hordeEvent);
@@ -131,7 +142,26 @@ public class HordeEventSpawner : MonoBehaviour
         isSpawning = false;
         var finishedEvent = currentHordeEvent;
         currentHordeEvent = null;
+        completedWaves++;
         OnHordeEventCompleted?.Invoke(finishedEvent);
+
+        // 无尽模式：延迟后重新开始同一尸潮
+        if (endlessWaves && finishedEvent != null)
+        {
+            StartCoroutine(RestartWaveAfterDelay(finishedEvent));
+        }
+    }
+
+    private IEnumerator RestartWaveAfterDelay(HordeEvent hordeEvent)
+    {
+        yield return new WaitForSeconds(endlessWaveDelay);
+
+        // 期间可能已由其他逻辑启动了新尸潮，或关闭了无尽模式
+        if (endlessWaves && !isSpawning)
+        {
+            VerboseLog.Log($"[HordeEventSpawner] 无尽模式：开始第 {completedWaves + 1} 波");
+            StartHordeEvent(hordeEvent);
+        }
     }
 
     private void SpawnEnemy()
