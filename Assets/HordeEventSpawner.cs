@@ -159,10 +159,10 @@ public class HordeEventSpawner : MonoBehaviour
 
     private static Vector3 RandomPointOnRing(float minRadius, float maxRadius)
     {
-        // 均匀角度，半径在[min,max]范围内；在XZ平面上围绕玩家生成
+        // 均匀角度，半径在[min,max]范围内；在XY平面上围绕玩家生成（2D游戏，Z轴为深度）
         float angle = Random.Range(0f, Mathf.PI * 2f);
         float radius = Random.Range(minRadius, maxRadius);
-        return new Vector3(Mathf.Cos(angle), 0f, Mathf.Sin(angle)) * radius;
+        return new Vector3(Mathf.Cos(angle), Mathf.Sin(angle), 0f) * radius;
     }
 
     private Vector3 CalculateSpawnPosition(HordeEvent hordeEvent)
