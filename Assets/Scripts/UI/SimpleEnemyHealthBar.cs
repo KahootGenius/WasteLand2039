@@ -62,7 +62,7 @@ public class SimpleEnemyHealthBar : MonoBehaviour
         // 初始更新
         UpdateHealthBar();
         
-        Debug.Log($"SimpleEnemyHealthBar: 已为 {gameObject.name} 创建血条，初始血量: {targetEnemy.GetCurrentHealth()}/{targetEnemy.GetMaxHealth()}");
+        VerboseLog.Log($"SimpleEnemyHealthBar: 已为 {gameObject.name} 创建血条，初始血量: {targetEnemy.GetCurrentHealth()}/{targetEnemy.GetMaxHealth()}");
     }
     
     private void CreateHealthBarUI()
@@ -189,7 +189,7 @@ public class SimpleEnemyHealthBar : MonoBehaviour
         fillImage.color = targetColor;
         
         // 调试信息
-        Debug.Log($"SimpleEnemyHealthBar: 血量 {currentHealth}/{maxHealth} ({healthPercentage:P0}), 颜色: {targetColor}, fillAmount: {fillImage.fillAmount}");
+        VerboseLog.Log($"SimpleEnemyHealthBar: 血量 {currentHealth}/{maxHealth} ({healthPercentage:P0}), 颜色: {targetColor}, fillAmount: {fillImage.fillAmount}");
     }
     
     private void OnDestroy()

@@ -88,7 +88,7 @@ public class PlayerHealthRegeneration : MonoBehaviour
         // 触发事件
         OnRegenerationStarted?.Invoke(healRate, duration);
         
-        Debug.Log($"开始生命恢复：每秒 {healRate} 点，持续 {duration} 秒");
+        VerboseLog.Log($"开始生命恢复：每秒 {healRate} 点，持续 {duration} 秒");
     }
     
     /// <summary>
@@ -119,7 +119,7 @@ public class PlayerHealthRegeneration : MonoBehaviour
         // 触发事件
         OnRegenerationEnded?.Invoke();
         
-        Debug.Log("生命恢复效果结束");
+        VerboseLog.Log("生命恢复效果结束");
     }
     
     /// <summary>
@@ -153,17 +153,17 @@ public class PlayerHealthRegeneration : MonoBehaviour
                     // 显示恢复效果
                     ShowHealingFlash();
                     
-                    Debug.Log($"恢复 {currentHealRate} 点生命值，剩余时间: {remainingTime} 秒");
+                    VerboseLog.Log($"恢复 {currentHealRate} 点生命值，剩余时间: {remainingTime} 秒");
                 }
                 else
                 {
-                    Debug.Log("生命值已满，停止恢复");
+                    VerboseLog.Log("生命值已满，停止恢复");
                     break;
                 }
             }
             else
             {
-                Debug.Log("玩家已死亡，停止恢复");
+                VerboseLog.Log("玩家已死亡，停止恢复");
                 break;
             }
         }
@@ -243,7 +243,7 @@ public class PlayerHealthRegeneration : MonoBehaviour
         if (isRegenerating)
         {
             remainingTime += additionalTime;
-            Debug.Log($"延长生命恢复时间 {additionalTime} 秒，总剩余时间: {remainingTime} 秒");
+            VerboseLog.Log($"延长生命恢复时间 {additionalTime} 秒，总剩余时间: {remainingTime} 秒");
         }
     }
     
@@ -256,7 +256,7 @@ public class PlayerHealthRegeneration : MonoBehaviour
         if (isRegenerating)
         {
             currentHealRate *= multiplier;
-            Debug.Log($"生命恢复速率提升至: {currentHealRate} 点/秒");
+            VerboseLog.Log($"生命恢复速率提升至: {currentHealRate} 点/秒");
         }
     }
     

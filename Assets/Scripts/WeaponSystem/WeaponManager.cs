@@ -310,21 +310,21 @@ public class WeaponManager : MonoBehaviour
         // 如果是鼠标输入，检查是否点击在UI上（添加调试信息）
         if (mouseInput)
         {
-            Debug.Log("[WeaponManager] 检测到鼠标左键点击");
+            VerboseLog.Log("[WeaponManager] 检测到鼠标左键点击");
             if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
             {
-                Debug.Log("[WeaponManager] 鼠标点击在UI上，忽略射击输入");
+                VerboseLog.Log("[WeaponManager] 鼠标点击在UI上，忽略射击输入");
                 return;
             }
             else
             {
-                Debug.Log("[WeaponManager] 鼠标点击不在UI上，继续处理射击");
+                VerboseLog.Log("[WeaponManager] 鼠标点击不在UI上，继续处理射击");
             }
         }
         
         if ((mouseInput || keyboardInput) && currentWeapon != null)
         {
-            Debug.Log($"[WeaponManager] 准备射击 - 鼠标输入: {mouseInput}, 键盘输入: {keyboardInput}, 当前武器: {currentWeapon.name}");
+            VerboseLog.Log($"[WeaponManager] 准备射击 - 鼠标输入: {mouseInput}, 键盘输入: {keyboardInput}, 当前武器: {currentWeapon.name}");
             
             // 检查角色是否在移动
             var playerController = GetComponentInParent<PlayerController>();
@@ -332,17 +332,17 @@ public class WeaponManager : MonoBehaviour
             {
                 // 检查角色是否在移动（通过检查移动方向的大小）
                 bool isMoving = playerController.GetComponent<Rigidbody2D>().velocity.magnitude > 0.1f;
-                Debug.Log($"[WeaponManager] 角色移动状态: {isMoving}, 速度: {playerController.GetComponent<Rigidbody2D>().velocity.magnitude}");
+                VerboseLog.Log($"[WeaponManager] 角色移动状态: {isMoving}, 速度: {playerController.GetComponent<Rigidbody2D>().velocity.magnitude}");
                 if (isMoving)
                 {
-                    Debug.Log("[WeaponManager] 角色正在移动，取消射击");
+                    VerboseLog.Log("[WeaponManager] 角色正在移动，取消射击");
                     return;
                 }
             }
             
-            Debug.Log("[WeaponManager] 尝试射击...");
+            VerboseLog.Log("[WeaponManager] 尝试射击...");
             bool fired = TryFire();
-            Debug.Log($"[WeaponManager] 射击结果: {fired}");
+            VerboseLog.Log($"[WeaponManager] 射击结果: {fired}");
             
             // 如果成功射击，触发攻击动画
             if (fired)
@@ -361,7 +361,7 @@ public class WeaponManager : MonoBehaviour
         {
             if (currentWeapon == null)
             {
-                Debug.Log("[WeaponManager] 无法射击：没有装备武器");
+                VerboseLog.Log("[WeaponManager] 无法射击：没有装备武器");
             }
         }
     }

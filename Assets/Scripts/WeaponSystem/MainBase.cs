@@ -146,7 +146,7 @@ public class MainBase : MonoBehaviour, IDamageable
             DestroyBase();
         }
         
-        Debug.Log($"Main Base took {damage} damage, remaining health: {currentHealth}/{maxHealth}");
+        VerboseLog.Log($"Main Base took {damage} damage, remaining health: {currentHealth}/{maxHealth}");
     }
     
     public float GetCurrentHealth()
@@ -243,11 +243,11 @@ public class MainBase : MonoBehaviour, IDamageable
             {
                 prompt += " | Press R to repair base";
             }
-            Debug.Log(prompt);
+            VerboseLog.Log(prompt);
         }
         else
         {
-            Debug.Log("Left Main Base interaction range");
+            VerboseLog.Log("Left Main Base interaction range");
         }
     }
     
@@ -276,7 +276,7 @@ public class MainBase : MonoBehaviour, IDamageable
         // 触发交互事件
         OnPlayerInteraction?.Invoke(this);
         
-        Debug.Log($"Player started health regeneration: {healingRate} HP per second for {healingDuration} seconds");
+        VerboseLog.Log($"Player started health regeneration: {healingRate} HP per second for {healingDuration} seconds");
     }
     
     #endregion
@@ -290,13 +290,13 @@ public class MainBase : MonoBehaviour, IDamageable
     {
         if (playerInventory == null)
         {
-            Debug.Log("Player inventory not found");
+            VerboseLog.Log("Player inventory not found");
             return;
         }
         
         if (currentHealth >= maxHealth)
         {
-            Debug.Log("Base is already at full health");
+            VerboseLog.Log("Base is already at full health");
             return;
         }
         
@@ -304,7 +304,7 @@ public class MainBase : MonoBehaviour, IDamageable
         RepairItem availableItem = FindAvailableRepairItem();
         if (availableItem == null)
         {
-            Debug.Log("No repair items available in inventory");
+            VerboseLog.Log("No repair items available in inventory");
             return;
         }
         
@@ -317,11 +317,11 @@ public class MainBase : MonoBehaviour, IDamageable
             // 播放修复音效
             PlaySound(healingSound);
             
-            Debug.Log($"Base repaired for {repairAmount} HP using {availableItem.requiredAmount}x {availableItem.item.itemName}");
+            VerboseLog.Log($"Base repaired for {repairAmount} HP using {availableItem.requiredAmount}x {availableItem.item.itemName}");
         }
         else
         {
-            Debug.Log($"Not enough {availableItem.item.itemName} to repair base");
+            VerboseLog.Log($"Not enough {availableItem.item.itemName} to repair base");
         }
     }
     
@@ -491,7 +491,7 @@ public class MainBase : MonoBehaviour, IDamageable
         // 游戏结束
         GameOver();
         
-        Debug.Log("Main Base has been destroyed! Game Over!");
+        VerboseLog.Log("Main Base has been destroyed! Game Over!");
     }
     
     /// <summary>
@@ -509,7 +509,7 @@ public class MainBase : MonoBehaviour, IDamageable
         Time.timeScale = 0f;
         
         // 可以在这里添加更多游戏结束逻辑
-        Debug.Log("Game Over!");
+        VerboseLog.Log("Game Over!");
     }
     
     #endregion
@@ -545,7 +545,7 @@ public class MainBase : MonoBehaviour, IDamageable
         
         OnHealthChanged?.Invoke(this, currentHealth, maxHealth);
         
-        Debug.Log($"Main Base healed {healAmount} HP, current health: {currentHealth}/{maxHealth}");
+        VerboseLog.Log($"Main Base healed {healAmount} HP, current health: {currentHealth}/{maxHealth}");
     }
     
     /// <summary>

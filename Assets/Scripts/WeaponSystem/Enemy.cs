@@ -206,7 +206,7 @@ public class Enemy : MonoBehaviour, IDamageable
             Die();
         }
         
-        Debug.Log($"{gameObject.name} 受到 {damage} 点伤害，剩余血量: {currentHealth}/{maxHealth}");
+        VerboseLog.Log($"{gameObject.name} 受到 {damage} 点伤害，剩余血量: {currentHealth}/{maxHealth}");
     }
     
     public float GetCurrentHealth()
@@ -328,7 +328,7 @@ public class Enemy : MonoBehaviour, IDamageable
             {
                 targetingMainBase = false;
                 isMainBaseInRange = false;
-                Debug.Log($"{gameObject.name} 发现玩家，停止攻击基地");
+                VerboseLog.Log($"{gameObject.name} 发现玩家，停止攻击基地");
             }
         }
     }
@@ -365,7 +365,7 @@ public class Enemy : MonoBehaviour, IDamageable
                     TriggerSwarmAlert(0); // 从传播层级0开始
                 }
                 
-                Debug.Log($"{gameObject.name} 检测到玩家，开始追击");
+                VerboseLog.Log($"{gameObject.name} 检测到玩家，开始追击");
             }
             else
             {
@@ -383,7 +383,7 @@ public class Enemy : MonoBehaviour, IDamageable
                     }
                     UpdateMovementAnimation(Vector2.zero, false);
                 }
-                Debug.Log($"{gameObject.name} 玩家离开检测范围");
+                VerboseLog.Log($"{gameObject.name} 玩家离开检测范围");
             }
         }
         
@@ -421,7 +421,7 @@ public class Enemy : MonoBehaviour, IDamageable
                 hasTarget = true;
                 targetingMainBase = true;
                 
-                Debug.Log($"{gameObject.name} 开始攻击主基地");
+                VerboseLog.Log($"{gameObject.name} 开始攻击主基地");
             }
             
             // 如果正在攻击基地，持续更新目标位置
@@ -446,7 +446,7 @@ public class Enemy : MonoBehaviour, IDamageable
             targetingMainBase = true;
             isMainBaseInRange = true;
             
-            Debug.Log($"{gameObject.name} 转向攻击主基地");
+            VerboseLog.Log($"{gameObject.name} 转向攻击主基地");
             return true;
         }
         return false;
@@ -650,7 +650,7 @@ public class Enemy : MonoBehaviour, IDamageable
                 if (targetDamageable != null)
                 {
                     targetDamageable.TakeDamage(attackDamage);
-                    Debug.Log($"{gameObject.name} 攻击了{targetName}，造成 {attackDamage} 点伤害");
+                    VerboseLog.Log($"{gameObject.name} 攻击了{targetName}，造成 {attackDamage} 点伤害");
                 }
             }
         }
@@ -683,7 +683,7 @@ public class Enemy : MonoBehaviour, IDamageable
                 {
                     Vector2 randomDirection = Random.insideUnitCircle.normalized;
                     currentTarget = (Vector2)transform.position + randomDirection * 2f;
-                    Debug.Log($"{gameObject.name} 检测到卡住，尝试脱困移动");
+                    VerboseLog.Log($"{gameObject.name} 检测到卡住，尝试脱困移动");
                 }
                 stuckTimer = 0f;
             }
@@ -843,7 +843,7 @@ public class Enemy : MonoBehaviour, IDamageable
         if (actualLength > 0)
         {
             deathAnimationDuration = actualLength;
-            Debug.Log($"{gameObject.name} 自动设置死亡动画时长为: {deathAnimationDuration}秒");
+            VerboseLog.Log($"{gameObject.name} 自动设置死亡动画时长为: {deathAnimationDuration}秒");
         }
     }
     
@@ -915,7 +915,7 @@ public class Enemy : MonoBehaviour, IDamageable
         isAlerted = true;
         currentPropagationLevel = propagationLevel;
         
-        Debug.Log($"{gameObject.name} 收到集群警报，传播层级: {propagationLevel}");
+        VerboseLog.Log($"{gameObject.name} 收到集群警报，传播层级: {propagationLevel}");
         
         // 向附近的敌人传播警报
         PropagateSwarmAlert(propagationLevel + 1);
@@ -961,7 +961,7 @@ public class Enemy : MonoBehaviour, IDamageable
         hasTarget = true;
         currentTarget = player.position;
         
-        Debug.Log($"{gameObject.name} 加入集群追击，传播层级: {propagationLevel}");
+        VerboseLog.Log($"{gameObject.name} 加入集群追击，传播层级: {propagationLevel}");
         
         // 继续传播警报
         PropagateSwarmAlert(propagationLevel + 1);
@@ -1062,7 +1062,7 @@ public class Enemy : MonoBehaviour, IDamageable
         playerRb.MovePosition(Vector2.Lerp(playerCollider.transform.position, targetPosition, Time.fixedDeltaTime * 10f));
         
         // 可选：添加调试信息
-        Debug.Log($"静止敌人 {gameObject.name} 阻止玩家进入碰撞箱");
+        VerboseLog.Log($"静止敌人 {gameObject.name} 阻止玩家进入碰撞箱");
     }
     
     #endregion
@@ -1138,7 +1138,7 @@ public class Enemy : MonoBehaviour, IDamageable
         // 触发死亡事件
         OnDeath?.Invoke(this);
         
-        Debug.Log($"{gameObject.name} 死亡");
+        VerboseLog.Log($"{gameObject.name} 死亡");
         
         // 计算销毁延迟时间
         float destroyDelay = CalculateDestroyDelay();
@@ -1253,7 +1253,7 @@ public class Enemy : MonoBehaviour, IDamageable
         
         OnHealthChanged?.Invoke(this, currentHealth, maxHealth);
         
-        Debug.Log($"{gameObject.name} 恢复 {healAmount} 点血量，当前血量: {currentHealth}/{maxHealth}");
+        VerboseLog.Log($"{gameObject.name} 恢复 {healAmount} 点血量，当前血量: {currentHealth}/{maxHealth}");
     }
     
     /// <summary>
@@ -1287,14 +1287,14 @@ public class Enemy : MonoBehaviour, IDamageable
         // 检查是否有可掉落的物品
         if (dropItems.Count == 0)
         {
-            Debug.Log($"{gameObject.name} 没有配置掉落物品");
+            VerboseLog.Log($"{gameObject.name} 没有配置掉落物品");
             return;
         }
         
         // 根据掉落概率决定是否掉落
         if (Random.Range(0f, 1f) > dropChance)
         {
-            Debug.Log($"{gameObject.name} 掉落概率检查失败，不掉落物品");
+            VerboseLog.Log($"{gameObject.name} 掉落概率检查失败，不掉落物品");
             return;
         }
         
@@ -1323,7 +1323,7 @@ public class Enemy : MonoBehaviour, IDamageable
         
         if (droppedItem != null)
         {
-            Debug.Log($"{gameObject.name} 掉落了 {dropAmount}x {selectedItem.itemName}");
+            VerboseLog.Log($"{gameObject.name} 掉落了 {dropAmount}x {selectedItem.itemName}");
         }
         else
         {

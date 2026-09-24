@@ -157,7 +157,7 @@ public class PlayerController : MonoBehaviour, IDamageable
     // 由动画事件调用，标记攻击结束
     public void OnAttackComplete()
     {
-        Debug.Log("[PlayerController] 攻击动画完成 - isAttacking设置为false");
+        VerboseLog.Log("[PlayerController] 攻击动画完成 - isAttacking设置为false");
         isAttacking = false;
     }
     
@@ -166,12 +166,12 @@ public class PlayerController : MonoBehaviour, IDamageable
     /// </summary>
     public void TriggerAttackAnimation()
     {
-        Debug.Log("[PlayerController] 触发攻击动画 - isAttacking设置为true");
+        VerboseLog.Log("[PlayerController] 触发攻击动画 - isAttacking设置为true");
         isAttacking = true;
         if (animator != null)
         {
             animator.SetTrigger(ATTACK);
-            Debug.Log("[PlayerController] 攻击动画触发器已设置: " + ATTACK);
+            VerboseLog.Log("[PlayerController] 攻击动画触发器已设置: " + ATTACK);
         }
         else
         {
@@ -197,7 +197,7 @@ public class PlayerController : MonoBehaviour, IDamageable
     public void EnableControl()
     {
         isControlEnabled = true;
-        Debug.Log("角色控制已启用");
+        VerboseLog.Log("角色控制已启用");
     }
     
     /// <summary>
@@ -208,7 +208,7 @@ public class PlayerController : MonoBehaviour, IDamageable
         isControlEnabled = false;
         moveDirection = Vector2.zero;
         rb.velocity = Vector2.zero; // 立即停止移动
-        Debug.Log("角色控制已禁用");
+        VerboseLog.Log("角色控制已禁用");
     }
     
     /// <summary>
@@ -241,7 +241,7 @@ public class PlayerController : MonoBehaviour, IDamageable
         currentHealth = Mathf.Max(0, currentHealth);
         
         // 控制台输出血量信息
-        Debug.Log($"[玩家血量] 受到 {damage} 点伤害，当前血量: {currentHealth}/{maxHealth}");
+        VerboseLog.Log($"[玩家血量] 受到 {damage} 点伤害，当前血量: {currentHealth}/{maxHealth}");
         
         // 显示受伤效果
         if (!isFlashing)
@@ -306,7 +306,7 @@ public class PlayerController : MonoBehaviour, IDamageable
         currentHealth += healAmount;
         currentHealth = Mathf.Min(maxHealth, currentHealth);
         
-        Debug.Log($"[玩家血量] 恢复 {healAmount} 点血量，当前血量: {currentHealth}/{maxHealth}");
+        VerboseLog.Log($"[玩家血量] 恢复 {healAmount} 点血量，当前血量: {currentHealth}/{maxHealth}");
     }
     
     /// <summary>
@@ -317,7 +317,7 @@ public class PlayerController : MonoBehaviour, IDamageable
     {
         maxHealth = newMaxHealth;
         currentHealth = Mathf.Min(currentHealth, maxHealth);
-        Debug.Log($"[玩家血量] 最大血量设置为: {maxHealth}");
+        VerboseLog.Log($"[玩家血量] 最大血量设置为: {maxHealth}");
     }
     
     /// <summary>
@@ -328,7 +328,7 @@ public class PlayerController : MonoBehaviour, IDamageable
         if (!isDead)
         {
             currentHealth = maxHealth;
-            Debug.Log($"[玩家血量] 血量完全恢复: {currentHealth}/{maxHealth}");
+            VerboseLog.Log($"[玩家血量] 血量完全恢复: {currentHealth}/{maxHealth}");
         }
     }
     
@@ -342,7 +342,7 @@ public class PlayerController : MonoBehaviour, IDamageable
             
         isDead = true;
         
-        Debug.Log("[玩家血量] 玩家死亡！");
+        VerboseLog.Log("[玩家血量] 玩家死亡！");
         
         // 禁用控制
         DisableControl();
@@ -376,7 +376,7 @@ public class PlayerController : MonoBehaviour, IDamageable
         isDead = false;
         currentHealth = maxHealth;
         
-        Debug.Log($"[玩家血量] 玩家复活！血量: {currentHealth}/{maxHealth}");
+        VerboseLog.Log($"[玩家血量] 玩家复活！血量: {currentHealth}/{maxHealth}");
         
         // 重新启用控制
         EnableControl();

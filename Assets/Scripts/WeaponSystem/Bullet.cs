@@ -82,9 +82,9 @@ public class Bullet : MonoBehaviour
         // 启动粒子效果
         if (particles != null)
         {
-            Debug.Log($"[Bullet] 启动粒子系统 - 粒子系统存在: {particles != null}, 是否启用: {particles.gameObject.activeInHierarchy}");
+            VerboseLog.Log($"[Bullet] 启动粒子系统 - 粒子系统存在: {particles != null}, 是否启用: {particles.gameObject.activeInHierarchy}");
             particles.Play();
-            Debug.Log($"[Bullet] 粒子系统状态 - 正在播放: {particles.isPlaying}, 发射启用: {particles.emission.enabled}, 发射率: {particles.emission.rateOverTime.constant}");
+            VerboseLog.Log($"[Bullet] 粒子系统状态 - 正在播放: {particles.isPlaying}, 发射启用: {particles.emission.enabled}, 发射率: {particles.emission.rateOverTime.constant}");
         }
         else
         {

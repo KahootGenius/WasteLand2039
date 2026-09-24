@@ -131,12 +131,12 @@ public class GameTimer : MonoBehaviour
     /// </summary>
     public void AdvanceToNextDay()
     {
-        Debug.LogError($"[{gameObject.name}.GameTimer.AdvanceToNextDay] 准备进入下一天！当前DayNum: {DayNum}");
+        VerboseLog.Log($"[{gameObject.name}.GameTimer.AdvanceToNextDay] 准备进入下一天！当前DayNum: {DayNum}");
         
         DayNum++;
         hordeEventTriggered = false;
 
-        Debug.LogError($"[{gameObject.name}.GameTimer.AdvanceToNextDay] DayNum已更新为: {DayNum}，现在调用UpdateDayDisplay()");
+        VerboseLog.Log($"[{gameObject.name}.GameTimer.AdvanceToNextDay] DayNum已更新为: {DayNum}，现在调用UpdateDayDisplay()");
         
         // 更新UI显示
         UpdateDayDisplay();
@@ -145,9 +145,9 @@ public class GameTimer : MonoBehaviour
         OnDayChanged?.Invoke(DayNum);
         
         // 加载新的尸潮事件
-        Debug.LogError($"[{gameObject.name}.GameTimer.AdvanceToNextDay] 现在为第 {DayNum} 天加载尸潮事件");
+        VerboseLog.Log($"[{gameObject.name}.GameTimer.AdvanceToNextDay] 现在为第 {DayNum} 天加载尸潮事件");
         LoadHordeEventForDay(DayNum);
-        Debug.LogError($"[{gameObject.name}.GameTimer.AdvanceToNextDay] 加载完成，currentHordeEvent: {(currentHordeEvent != null ? currentHordeEvent.hordeName : "null")}");
+        VerboseLog.Log($"[{gameObject.name}.GameTimer.AdvanceToNextDay] 加载完成，currentHordeEvent: {(currentHordeEvent != null ? currentHordeEvent.hordeName : "null")}");
     }
     
     /// <summary>
@@ -164,14 +164,14 @@ public class GameTimer : MonoBehaviour
             if (dayHordeEvent.day == day && dayHordeEvent.hordeEvent != null)
             {
                 currentHordeEvent = dayHordeEvent.hordeEvent;
-                Debug.Log($"[GameTimer] 已为第 {day} 天加载事件: {currentHordeEvent.hordeName}");
+                VerboseLog.Log($"[GameTimer] 已为第 {day} 天加载事件: {currentHordeEvent.hordeName}");
                 break;
             }
         }
 
         if (currentHordeEvent == null)
         {
-            Debug.Log($"[GameTimer] 第 {day} 天没有找到对应的尸潮事件。");
+            VerboseLog.Log($"[GameTimer] 第 {day} 天没有找到对应的尸潮事件。");
         }
         
 
@@ -182,17 +182,17 @@ public class GameTimer : MonoBehaviour
     /// </summary>
     private void TriggerHordeEvent()
     {
-        Debug.LogError($"[{gameObject.name}.GameTimer.TriggerHordeEvent] 尝试触发尸潮事件 - DayNum: {DayNum}, currentHordeEvent: {(currentHordeEvent != null ? currentHordeEvent.hordeName : "null")}, hordeEventTriggered: {hordeEventTriggered}");
+        VerboseLog.Log($"[{gameObject.name}.GameTimer.TriggerHordeEvent] 尝试触发尸潮事件 - DayNum: {DayNum}, currentHordeEvent: {(currentHordeEvent != null ? currentHordeEvent.hordeName : "null")}, hordeEventTriggered: {hordeEventTriggered}");
         
         if (currentHordeEvent != null && !hordeEventTriggered)
         {
-            Debug.LogError($"[{gameObject.name}.GameTimer.TriggerHordeEvent] 正在为第 {DayNum} 天触发事件: {currentHordeEvent.hordeName}");
-            Debug.LogError($"[{gameObject.name}.GameTimer.TriggerHordeEvent] 事件参数 - 总敌人数: {currentHordeEvent.totalEnemyCount}, 最大活跃数: {currentHordeEvent.maxActiveEnemies}, 生成间隔: {currentHordeEvent.spawnInterval}");
+            VerboseLog.Log($"[{gameObject.name}.GameTimer.TriggerHordeEvent] 正在为第 {DayNum} 天触发事件: {currentHordeEvent.hordeName}");
+            VerboseLog.Log($"[{gameObject.name}.GameTimer.TriggerHordeEvent] 事件参数 - 总敌人数: {currentHordeEvent.totalEnemyCount}, 最大活跃数: {currentHordeEvent.maxActiveEnemies}, 生成间隔: {currentHordeEvent.spawnInterval}");
             
             hordeEventTriggered = true;
             OnHordeEventTriggered?.Invoke(currentHordeEvent);
             
-            Debug.LogError($"[{gameObject.name}.GameTimer.TriggerHordeEvent] 事件已触发，OnHordeEventTriggered事件已调用");
+            VerboseLog.Log($"[{gameObject.name}.GameTimer.TriggerHordeEvent] 事件已触发，OnHordeEventTriggered事件已调用");
         }
         else
         {
@@ -258,7 +258,7 @@ public class GameTimer : MonoBehaviour
     /// </summary>
     public void TestHordeEventSystem()
     {
-        Debug.Log($"[GameTimer] 测试 - 天数: {DayNum}, 事件: {(currentHordeEvent != null ? currentHordeEvent.hordeName : "无")}, 已触发: {hordeEventTriggered}");
+        VerboseLog.Log($"[GameTimer] 测试 - 天数: {DayNum}, 事件: {(currentHordeEvent != null ? currentHordeEvent.hordeName : "无")}, 已触发: {hordeEventTriggered}");
         
         // 尝试手动触发当前事件
         if (currentHordeEvent != null && !hordeEventTriggered)
