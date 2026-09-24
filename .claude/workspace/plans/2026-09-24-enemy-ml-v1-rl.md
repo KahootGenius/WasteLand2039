@@ -1,6 +1,6 @@
 # Plan: learning enemies, V1 (reinforcement learning)
 
-*2026-09-24. Status: **approved; Phase 0 done** (branch `experiment/enemy-ml`). V2 = option (a).*
+*2026-09-24. Status: **approved; Phases 0–1 done** (branch `experiment/enemy-ml`). V2 = option (a).*
 
 > **Scope note from the user:** this is **experimental, for comparative analysis only**. The user has another design of their own that they expect to perform better. Keep the ML work isolated: new files, thin hooks into existing code, and the experiment branch only. If useful later, the user's design can plug into the same `IHordeCommander` seam as another comparison arm, but only if they want that.
 
@@ -99,7 +99,7 @@ Lightweight fallback: if the Python stack fights back, the same commander can be
 | Phase | Deliverables | Exit criteria | Rough size |
 |---|---|---|---|
 | **0. Groundwork** ✅ | Git init + Unity `.gitignore`; fix spawn-ring bug; gate the log spam behind a debug flag; "endless waves" test mode | Clean commit; hordes spawn in a real ring; 20× time scale runs smoothly | **Done 2026-09-24**, see §10 |
-| **1. Order API + commander seam** | `Enemy` order states (MoveTo / HoldAmbush / Chase); `Squad`; spawner accepts commander spawn requests; `IHordeCommander`; `BaselineCommander` | Game plays the same as today through the baseline commander | ~1 week |
+| **1. Order API + commander seam** ✅ | `Enemy` order states (MoveTo / HoldAmbush / Chase); `Squad`; spawner accepts commander spawn requests; `IHordeCommander`; `BaselineCommander` | Game plays the same as today through the baseline commander | ~1 week |
 | **2. Zones, profiler, telemetry** | `ZoneMarker`/`ZoneMap`; `EngagementTracker` (fight/flee classifier); `PlayerProfiler`; `TelemetryLogger` (CSV/JSONL to `Application.persistentDataPath`) | You play 10 min deliberately "fighting", then 10 min "fleeing east", and the profiler reports both correctly | ~1 week |
 | **3. Arena + bot personas** | `MLArena` scene (3–4 exit routes, replicated ×8); input abstraction so `PlayerController`/`WeaponManager` can be driven by a bot; persona ScriptableObjects | Each persona produces the expected profile in the profiler | ~1 week |
 | **4. V1 training** | ML-Agents package + conda env; `RLCommander` agent; PPO config; curriculum; trained `.onnx`; inference in `MainGame` | Beats the baseline on the interception metrics vs every persona; shows the pre-positioning behavior (§4 test case) | 1–2 weeks (iterative) |
@@ -160,3 +160,24 @@ Sizes are rough solo estimates and will firm up after Phase 1.
   - The Console is quiet during combat.
   - Endless mode restarts waves.
   - The game runs smoothly at a raised `Time.timeScale`.
+
+### Phase 1: done 2026-09-24
+- **Order API** (commit 00e11f68):
+  - `EnemyOrder` supports None / MoveTo / HoldAt(pos, engageRadius) / Chase.
+  - `Enemy` is now `partial`. The order logic is in `EnemyAI/Orders/Enemy.Orders.cs`; `Enemy.cs` only gains hooks in DetectPlayer, DetectTargets, PathfindingUpdate and CheckIfStuck, and every hook is a no-op with no order.
+  - `Squad` groups enemies under one order.
+  - Orders are drawn as gizmos: yellow = MoveTo, magenta = HoldAt.
+- **Commander seam** (commit 7fb1e67b):
+  - `IHordeCommander` has 5 callbacks: OnWaveStarted, ChooseSpawnPosition, OnEnemySpawned, Tick, OnWaveCompleted. `HordeContext` is the shared, read-only input to every commander.
+  - `HordeEventSpawner` resolves its commander from the Inspector field, else a component on the same object, else a runtime-added `BaselineCommander`. No scene changes are needed.
+  - `BaselineCommander` is the control group. It uses the same ring spawn rule with the same order of Random calls, and issues no orders.
+  - `DebugOrdersCommander` is a test harness only, not a comparison arm.
+- **Verified:** compile check passes in both Editor and player versions (83 scripts, 0 errors, 7 warnings, same as baseline). No GUID collisions. Each order type was traced by hand through `Enemy`'s update loop.
+- **Found while tracing** (these are existing behavior, deliberately left as-is because they define the control group):
+  - Swarm alerts never take effect.
+  - The stuck-escape and obstacle-avoidance targets are overwritten every frame.
+  - As a result, baseline zombies chase within 5 units and otherwise walk in a straight line to the base.
+- **Not yet verified (needs the Unity Editor):** baseline play looks unchanged. With `DebugOrdersCommander` added to `DayManager`: ambush squads hold their posts, charge when the player comes near, and go back when the player escapes; the MoveTo squad reverts to marching on the base; the chase squad follows from any distance.
+- **Implications for later phases:**
+  - Because obstacle avoidance never takes effect, ordered squads (like all zombies today) walk straight lines and can get snagged on cars and trucks. Phase 3's arena should keep routes clear of props, or Phase 4 may need a simple waypoint path.
+  - `EnemySpawner` (background spawner, off by default) bypasses the commander. Leave it disabled in experiments.

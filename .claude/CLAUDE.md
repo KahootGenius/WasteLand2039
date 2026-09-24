@@ -52,6 +52,9 @@ Real game changes (scripts, prefabs, scenes, ScriptableObjects) still go in thei
 | UI | `Assets/Scripts/UI/` | `MainMenuUI`, `PauseMenuUI`, `SurvivalManualUI`, enemy health bars |
 | Intro / tutorial / dialogue | `Assets/Scripts/IntroSequence/`, `TutorialGuideManager`, `Assets/DialogueSystem.cs` | `IntroController`, `GifPlayer`, `DialogueSystem` |
 | Data assets | `Assets/Items/`, `Assets/Resources/CraftingRecipes/`, `Assets/Dialogue/`, `Assets/Day 2.asset`, `Assets/Day 3.asset` | ScriptableObject instances |
+| Enemy AI experiment *(branch `experiment/enemy-ml`)* | `Assets/Scripts/EnemyAI/Orders/`, `Assets/Scripts/EnemyAI/Commanders/` | `EnemyOrder` (MoveTo / HoldAt / Chase), `Enemy.Orders.cs` (partial `Enemy`), `Squad`, `IHordeCommander`, `HordeContext`, `BaselineCommander`, `DebugOrdersCommander` |
+
+`HordeEventSpawner` and `GameTimer` sit on the **`DayManager`** GameObject in `MainGame`. The spawner uses the commander in its Inspector field; failing that, a commander component on the same object; failing that, it adds a `BaselineCommander` at runtime.
 
 Scenes and flow: `Assets/MainMenu.unity` → `Assets/IntroScene.unity` (used as a loading screen by `SceneController`) → `Assets/MainGame.unity`. That is exactly the Build Settings order. Scene names are loaded by string, so if you rename a scene, grep the code and the saved scene fields (`mainMenuSceneName`, `gameSceneName`, `loadingSceneName`, `SceneName`). `Assets/Scenes/SampleScene.unity` is unused and not in the build.
 
@@ -62,6 +65,11 @@ Scenes and flow: `Assets/MainMenu.unity` → `Assets/IntroScene.unity` (used as 
 - `Resources.LoadAll<Item>("")` finds nothing, because `Item` assets live in `Assets/Items/`. The `GameManager` / `GameDataManager` prefabs that `SceneController` loads from Resources don't exist.
 - **Spawn bug:** `HordeEventSpawner.RandomPointOnRing` used `(cos, 0, sin)`, the X/Z plane, so enemies spawned on a horizontal line through the player. **Fixed on `experiment/enemy-ml` only** (commit "Fix horde spawn ring…"); cherry-pick it to `main` if wanted.
 - **Log spam:** fixed on `experiment/enemy-ml` via `VerboseLog`. Still present on `main`.
+- **The baseline enemy AI is simpler than its code suggests.** Two features never take effect, because `Enemy` overwrites `currentTarget` every frame (`DetectMainBase` / `DetectPlayer`, now also `UpdateOrderTarget`):
+  - **Swarm alerts:** `JoinSwarmChase` sets the target to the player once, and it's replaced by the base on the next frame.
+  - **Stuck escape and obstacle avoidance:** the random nudge and the avoidance waypoint are overwritten the same way.
+
+  So in practice a zombie chases the player within 5 units, and otherwise walks in a straight line to the base. Describe the baseline this way in the comparison, and don't "fix" it on the experiment branch without the user's say-so, because it would change the control group.
 - `SceneController.InitializeSceneSpecificSystems` has `case "GameScene":`, but the game scene is `MainGame`, so that branch never runs. It currently does nothing useful anyway (see the missing `GameManager` prefab above).
 - `HordeEvent_使用说明.txt` (project root) describes `DayManager` / `HordeSpawner`, which have since been removed or commented out. Horde config now lives on `GameTimer.dayHordeEvents`.
 - There are about 21 debug, fixer, tester, and demo scripts in `InventorySystem/`. The fixer scripts checked are not referenced by any scene, so they are likely leftovers.
@@ -71,7 +79,7 @@ Scenes and flow: `Assets/MainMenu.unity` → `Assets/IntroScene.unity` (used as 
 - **Learning enemies, for comparative analysis only.** Branch `experiment/enemy-ml`. Plan: `workspace/plans/2026-09-24-enemy-ml-v1-rl.md`.
   - **V1** = RL commander (ML-Agents PPO).
   - **V2** = supervised escape-zone prediction plus scripted squad tactics (option a).
-  - **Status:** Phase 0 done 2026-09-24; Phase 1 (order API + swappable commander) is next.
+  - **Status:** Phases 0 and 1 done 2026-09-24. Next is Phase 2: zones, player profiler, telemetry.
   - The user says this is **experimental**. They have **another design of their own that they expect to perform better**. Keep the ML work isolated (new files, thin hooks, experiment branch), and don't push it into `main` or into their design.
   - Training files will live in `MLTraining/` at the repo root, outside `Assets/`.
 
