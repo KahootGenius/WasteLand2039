@@ -1,0 +1,68 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!78 &1
+TagManager:
+  serializedVersion: 2
+  tags:
+  - MainBase
+  layers:
+  - Default
+  - TransparentFX
+  - Ignore Raycast
+  - 
+  - Water
+  - UI
+  - Tilemap
+  - Buildings
+  - Item
+  - Player
+  - Enemy
+  - Bullet
+  - NPC
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  - 
+  m_SortingLayers:
+  - name: Default
+    uniqueID: 0
+    locked: 0
+  - name: Interactables
+    uniqueID: 271919695
+    locked: 0
+  - name: Tilemaps
+    uniqueID: 444307453
+    locked: 0
+  - name: Buildings
+    uniqueID: 3121590065
+    locked: 0
+  - name: Player
+    uniqueID: 3050349233
+    locked: 0
+  - name: Attackable
+    uniqueID: 3095914269
+    locked: 0
+  - name: Items
+    uniqueID: 634099155
+    locked: 0
+  - name: NPC
+    uniqueID: 1005493313
+    locked: 0
+  - name: Stuff
+    uniqueID: 3847905129
+    locked: 0

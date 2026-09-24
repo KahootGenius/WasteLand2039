@@ -1,0 +1,74 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1f0c340dc08fc4e6daa8b2de5d8c46ee, type: 3}
+  m_Name: SurvivalManualData
+  m_EditorClassIdentifier: 
+  topics:
+  - topicName: Keyboard Settings
+    pages:
+    - title: Keyboard Settings
+      content: 'Press F For Interaction
+
+        Press L To Fix the Main Base with
+        Fixer
+
+        Press E To Interact with Crafting Table
+
+        Press R To
+        Recharge your Gun'
+      illustration: {fileID: -1208645986, guid: 5dcd436ad254c42fda4167e874b9abfe, type: 3}
+  - topicName: Fighting Techniques
+    pages:
+    - title: Fire
+      content: 'Aim with your mouse, and left click/space to shoot.
+
+        You
+        need to recharge for shooting, which cost you 1 bullet
+
+        Remember
+        to prepare enough bullet in your inventory, which you can craft from the
+        crafting table.'
+      illustration: {fileID: 1702627418, guid: e3d4e54fbeed1e64eb3b287c7c9ab86e, type: 3}
+    - title: Survive
+      content: 'Survival is crucial for you, you have to protect your self and your
+        main base.
+
+        You can heal your self with medicines, and fix your main
+        base with fixers.
+
+        Interact with the Main Base to heal your self
+        is a good option for intial stage of playing.'
+      illustration: {fileID: 529606351, guid: e3d4e54fbeed1e64eb3b287c7c9ab86e, type: 3}
+  - topicName: Crafting System
+    pages:
+    - title: Crafting Basic
+      content: 'You can get every type of basic matieral from killing enemies.
+
+        Craft
+        stuff at the crafting table.
+
+        For some recipe, you have to find the
+        special schematic to unlock it.'
+      illustration: {fileID: 21300000, guid: bf47c9a1fc5dd3f4f94e7436e50c8c04, type: 3}
+  - topicName: Exploration & Game Content
+    pages:
+    - title: Outside the Base
+      content: Go outside the base to explore the city, there's chests and containers
+        for you to get resources from. Gain comes with risk, enemy might be wondering
+        around between buildings, prepare your weapon !
+      illustration: {fileID: 21300000, guid: 7a7f4bf16aebcbf46aea96d30a8e029e, type: 3}
+    - title: Hordes
+      content: Everyday, there's possibly a horde waiting for you. But don't worry,
+        days won't go automatically. In fact, you have to find the NPC and interact
+        with them to enter the next day. These NPCs are somewhere in the city, search
+        for them while exploring.
+      illustration: {fileID: 21300000, guid: 7a7f4bf16aebcbf46aea96d30a8e029e, type: 3}

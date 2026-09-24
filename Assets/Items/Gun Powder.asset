@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b1a58ea1bd595bf4c886c658acd2ae58, type: 3}
+  m_Name: Gun Powder
+  m_EditorClassIdentifier: 
+  itemName: Gun Powder
+  icon: {fileID: -267147783, guid: e3d4e54fbeed1e64eb3b287c7c9ab86e, type: 3}
+  description: Item Description
+  itemType: 3
+  itemLevel: 1
+  isStackable: 1
+  maxStackSize: 100
+  currentAmount: 1
+  itemPrefab: {fileID: 0}
+  isQuestItem: 0
+  isConsumable: 0
