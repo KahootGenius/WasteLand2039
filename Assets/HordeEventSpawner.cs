@@ -8,6 +8,7 @@ using UnityEngine;
 /// - 当某天绑定了 HordeEvent（例如 DayNum==2）时，直接按资产里的参数生成尸潮
 /// - 仅依赖 HordeEvent 的以下字段：
 ///   totalEnemyCount, maxActiveEnemies, spawnInterval, spawnRadius, minSpawnDistance, enemyTypes
+/// - 生成位置和敌人命令由指挥官（IHordeCommander）决定；默认 BaselineCommander = 原版行为
 /// </summary>
 public class HordeEventSpawner : MonoBehaviour
 {
@@ -23,6 +24,16 @@ public class HordeEventSpawner : MonoBehaviour
     public bool endlessWaves = false;
     [Tooltip("无尽模式下两波之间的间隔（秒，受 Time.timeScale 影响）")]
     public float endlessWaveDelay = 3f;
+
+    [Header("指挥官（敌人AI）")]
+    [Tooltip("实现 IHordeCommander 的组件。为空时自动使用本物体上的指挥官组件；都没有则添加 BaselineCommander（原版行为）")]
+    [SerializeField] private MonoBehaviour commanderComponent;
+
+    private IHordeCommander commander;
+    private HordeContext context;
+
+    public IHordeCommander Commander => commander;
+    public HordeContext Context => context;
 
     // 运行时状态
     private HordeEvent currentHordeEvent;
@@ -58,6 +69,58 @@ public class HordeEventSpawner : MonoBehaviour
             var player = GameObject.FindGameObjectWithTag("Player");
             if (player != null) playerTransform = player.transform;
         }
+
+        EnsureCommander();
+    }
+
+    private void OnValidate()
+    {
+        // 拖入物体时 Unity 会选中其第一个 MonoBehaviour，这里改为该物体上的指挥官组件
+        if (commanderComponent != null && !(commanderComponent is IHordeCommander))
+        {
+            var found = commanderComponent.GetComponent<IHordeCommander>() as MonoBehaviour;
+            if (found == null)
+                Debug.LogWarning($"[HordeEventSpawner] {commanderComponent.name} 上没有实现 IHordeCommander 的组件", this);
+            commanderComponent = found;
+        }
+    }
+
+    private void EnsureCommander()
+    {
+        if (commander != null)
+            return;
+
+        context = new HordeContext(activeEnemies)
+        {
+            Player = playerTransform,
+            MainBase = FindMainBase()
+        };
+
+        if (commanderComponent is IHordeCommander assigned)
+        {
+            commander = assigned;
+        }
+        else
+        {
+            // 不用 ??：Unity 对象的空值判断需要走 UnityEngine.Object 的 == 重载
+            var onThisObject = GetComponent<IHordeCommander>();
+            commander = (onThisObject as Object) != null
+                ? onThisObject
+                : gameObject.AddComponent<BaselineCommander>();
+        }
+
+        VerboseLog.Log($"[HordeEventSpawner] 指挥官: {commander.DisplayName}");
+    }
+
+    private static Transform FindMainBase()
+    {
+        // 与 Enemy.FindMainBase 相同的查找顺序
+        GameObject baseObj = GameObject.FindGameObjectWithTag("MainBase");
+        if (baseObj != null)
+            return baseObj.transform;
+
+        MainBase mainBaseComponent = FindObjectOfType<MainBase>();
+        return mainBaseComponent != null ? mainBaseComponent.transform : null;
     }
 
     private void OnDestroy()
@@ -76,6 +139,9 @@ public class HordeEventSpawner : MonoBehaviour
 
         // 清理已被销毁的敌人
         activeEnemies.RemoveAll(e => e == null);
+
+        // 指挥官决策（频率由指挥官自行控制）
+        commander.Tick(context);
 
         // 生成间隔判定
         if (Time.time - lastSpawnTime >= currentHordeEvent.spawnInterval)
@@ -132,7 +198,15 @@ public class HordeEventSpawner : MonoBehaviour
         lastSpawnTime = 0f;
         activeEnemies.Clear();
 
-        VerboseLog.Log($"[HordeEventSpawner.StartHordeEvent] 事件已启动，isSpawning: {isSpawning}, spawnedCount: {spawnedCount}");
+        EnsureCommander();
+        context.Wave = hordeEvent;
+        context.Player = playerTransform;
+        context.WaveIndex = completedWaves;
+        context.WaveStartTime = Time.time;
+        context.SpawnedCount = 0;
+        commander.OnWaveStarted(context);
+
+        VerboseLog.Log($"[HordeEventSpawner.StartHordeEvent] 事件已启动，isSpawning: {isSpawning}, spawnedCount: {spawnedCount}, 指挥官: {commander.DisplayName}");
 
         OnHordeEventStarted?.Invoke(hordeEvent);
     }
@@ -143,6 +217,8 @@ public class HordeEventSpawner : MonoBehaviour
         var finishedEvent = currentHordeEvent;
         currentHordeEvent = null;
         completedWaves++;
+        commander.OnWaveCompleted(context);
+        context.Wave = null;
         OnHordeEventCompleted?.Invoke(finishedEvent);
 
         // 无尽模式：延迟后重新开始同一尸潮
@@ -174,8 +250,8 @@ public class HordeEventSpawner : MonoBehaviour
         if (enemyPrefab == null)
             return;
 
-        // 计算生成位置：在玩家周围的环带内 [minSpawnDistance, spawnRadius]
-        Vector3 spawnPos = CalculateSpawnPosition(currentHordeEvent);
+        // 生成位置由指挥官决定（BaselineCommander = 原版规则：玩家周围 [minSpawnDistance, spawnRadius] 环带）
+        Vector3 spawnPos = commander.ChooseSpawnPosition(context);
 
         // 实例化
         GameObject enemy = Instantiate(enemyPrefab, spawnPos, Quaternion.identity);
@@ -183,24 +259,13 @@ public class HordeEventSpawner : MonoBehaviour
         {
             activeEnemies.Add(enemy);
             spawnedCount++;
+            context.SpawnedCount = spawnedCount;
+
+            var enemyComponent = enemy.GetComponent<Enemy>();
+            if (enemyComponent != null)
+                commander.OnEnemySpawned(context, enemyComponent);
+
             OnEnemySpawned?.Invoke(enemy);
         }
-    }
-
-    private static Vector3 RandomPointOnRing(float minRadius, float maxRadius)
-    {
-        // 均匀角度，半径在[min,max]范围内；在XY平面上围绕玩家生成（2D游戏，Z轴为深度）
-        float angle = Random.Range(0f, Mathf.PI * 2f);
-        float radius = Random.Range(minRadius, maxRadius);
-        return new Vector3(Mathf.Cos(angle), Mathf.Sin(angle), 0f) * radius;
-    }
-
-    private Vector3 CalculateSpawnPosition(HordeEvent hordeEvent)
-    {
-        if (playerTransform == null) return Vector3.zero;
-        float min = Mathf.Max(0f, hordeEvent.minSpawnDistance);
-        float max = Mathf.Max(min + 0.01f, hordeEvent.spawnRadius);
-        Vector3 offset = RandomPointOnRing(min, max);
-        return playerTransform.position + offset;
     }
 }
