@@ -137,7 +137,7 @@ public class RangedWeapon : MonoBehaviour
             nextFireTime = 0f;
         }
         
-        Debug.Log($"[RangedWeapon] OnEnable - 重置射击冷却时间: {nextFireTime}, 重装状态: {isReloading}, 当前Time.time: {Time.time}");
+        VerboseLog.Log($"[RangedWeapon] OnEnable - 重置射击冷却时间: {nextFireTime}, 重装状态: {isReloading}, 当前Time.time: {Time.time}");
     }
     
     private void OnDisable()
@@ -151,7 +151,7 @@ public class RangedWeapon : MonoBehaviour
             isReloading = false;
         }
         
-        Debug.Log($"[RangedWeapon] OnDisable - 清理重装状态: {isReloading}");
+        VerboseLog.Log($"[RangedWeapon] OnDisable - 清理重装状态: {isReloading}");
     }
     
     /// <summary>
@@ -161,8 +161,8 @@ public class RangedWeapon : MonoBehaviour
     /// <returns>是否成功射击</returns>
     public bool TryFire(Vector2 targetDirection)
     {
-        Debug.Log($"[RangedWeapon] TryFire开始 - 目标方向: {targetDirection}, 当前时间: {Time.time}, 下次射击时间: {nextFireTime}, 可以射击: {CanFire}");
-        Debug.Log($"[RangedWeapon] 武器状态检查 - fireRate: {weaponStats.fireRate}, 射击间隔: {(1f/weaponStats.fireRate):F6}秒, 弹药: {currentAmmo}, 重装中: {isReloading}");
+        VerboseLog.Log($"[RangedWeapon] TryFire开始 - 目标方向: {targetDirection}, 当前时间: {Time.time}, 下次射击时间: {nextFireTime}, 可以射击: {CanFire}");
+        VerboseLog.Log($"[RangedWeapon] 武器状态检查 - fireRate: {weaponStats.fireRate}, 射击间隔: {(1f/weaponStats.fireRate):F6}秒, 弹药: {currentAmmo}, 重装中: {isReloading}");
         
         // 额外的调试信息：检查是否存在异常的nextFireTime值
         if (nextFireTime > Time.time + 10f)
@@ -175,11 +175,11 @@ public class RangedWeapon : MonoBehaviour
         {
             if (isReloading)
             {
-                Debug.Log("[RangedWeapon] 无法射击：正在重装弹药");
+                VerboseLog.Log("[RangedWeapon] 无法射击：正在重装弹药");
             }
             else if (currentAmmo <= 0)
             {
-                Debug.Log("[RangedWeapon] 无法射击：弹药不足");
+                VerboseLog.Log("[RangedWeapon] 无法射击：弹药不足");
                 PlaySound(emptySound);
             }
             else if (Time.time < nextFireTime)
@@ -194,12 +194,12 @@ public class RangedWeapon : MonoBehaviour
                     return TryFire(targetDirection); // 重新尝试射击
                 }
                 
-                Debug.Log($"[RangedWeapon] 无法射击：冷却中，剩余时间: {remainingCooldown:F6}秒, fireRate: {weaponStats.fireRate}");
+                VerboseLog.Log($"[RangedWeapon] 无法射击：冷却中，剩余时间: {remainingCooldown:F6}秒, fireRate: {weaponStats.fireRate}");
             }
             return false;
         }
         
-        Debug.Log("[RangedWeapon] 射击条件满足，执行射击");
+        VerboseLog.Log("[RangedWeapon] 射击条件满足，执行射击");
         Fire(targetDirection);
         return true;
     }
@@ -210,11 +210,11 @@ public class RangedWeapon : MonoBehaviour
     /// <param name="direction">射击方向</param>
     private void Fire(Vector2 direction)
     {
-        Debug.Log($"[RangedWeapon] Fire开始 - 射击前弹药: {currentAmmo}, 射击方向: {direction}");
+        VerboseLog.Log($"[RangedWeapon] Fire开始 - 射击前弹药: {currentAmmo}, 射击方向: {direction}");
         
         // 消耗弹药
         currentAmmo--;
-        Debug.Log($"[RangedWeapon] 弹药消耗后: {currentAmmo}");
+        VerboseLog.Log($"[RangedWeapon] 弹药消耗后: {currentAmmo}");
         
         // 设置下次射击时间
         float cooldownTime = 1f / Mathf.Max(weaponStats.fireRate, 0.1f); // 防止除零和异常小的值
@@ -228,11 +228,11 @@ public class RangedWeapon : MonoBehaviour
             nextFireTime = Time.time + cooldownTime;
         }
         
-        Debug.Log($"[RangedWeapon] 射击冷却计算 - fireRate: {weaponStats.fireRate}, 冷却时间: {cooldownTime:F3}秒, 下次射击时间: {nextFireTime} (当前时间: {Time.time})");
+        VerboseLog.Log($"[RangedWeapon] 射击冷却计算 - fireRate: {weaponStats.fireRate}, 冷却时间: {cooldownTime:F3}秒, 下次射击时间: {nextFireTime} (当前时间: {Time.time})");
         
         // 计算射击方向（加入精度影响）
         Vector2 fireDirection = CalculateFireDirection(direction);
-        Debug.Log($"[RangedWeapon] 计算后的射击方向: {fireDirection}");
+        VerboseLog.Log($"[RangedWeapon] 计算后的射击方向: {fireDirection}");
         
         // 创建子弹
         CreateBullet(firePoint.position, fireDirection);
@@ -244,12 +244,12 @@ public class RangedWeapon : MonoBehaviour
         OnWeaponFired?.Invoke();
         OnAmmoChanged?.Invoke(currentAmmo, weaponStats.magazineSize);
         
-        Debug.Log($"[RangedWeapon] Fire完成 - 剩余弹药: {currentAmmo}");
+        VerboseLog.Log($"[RangedWeapon] Fire完成 - 剩余弹药: {currentAmmo}");
         
         // 如果弹药用完，自动重装
         if (currentAmmo <= 0)
         {
-            Debug.Log("[RangedWeapon] 弹药用完，开始自动重装");
+            VerboseLog.Log("[RangedWeapon] 弹药用完，开始自动重装");
             StartReload();
         }
     }
@@ -285,7 +285,7 @@ public class RangedWeapon : MonoBehaviour
     /// <param name="direction">发射方向</param>
     private void CreateBullet(Vector3 position, Vector2 direction)
     {
-        Debug.Log($"[RangedWeapon] CreateBullet - 位置: {position}, 方向: {direction}");
+        VerboseLog.Log($"[RangedWeapon] CreateBullet - 位置: {position}, 方向: {direction}");
         
         if (bulletPrefab == null)
         {
@@ -293,18 +293,18 @@ public class RangedWeapon : MonoBehaviour
             return;
         }
         
-        Debug.Log($"[RangedWeapon] 使用子弹预制体: {bulletPrefab.name}");
+        VerboseLog.Log($"[RangedWeapon] 使用子弹预制体: {bulletPrefab.name}");
         
         GameObject bullet = Instantiate(bulletPrefab, position, Quaternion.identity);
-        Debug.Log($"[RangedWeapon] 子弹实例化成功: {bullet.name}");
+        VerboseLog.Log($"[RangedWeapon] 子弹实例化成功: {bullet.name}");
         
         Bullet bulletComponent = bullet.GetComponent<Bullet>();
         
         if (bulletComponent != null)
         {
-            Debug.Log($"[RangedWeapon] 初始化子弹 - 速度: {weaponStats.bulletSpeed}, 伤害: {weaponStats.damage}, 生命时间: {weaponStats.bulletLifetime}");
+            VerboseLog.Log($"[RangedWeapon] 初始化子弹 - 速度: {weaponStats.bulletSpeed}, 伤害: {weaponStats.damage}, 生命时间: {weaponStats.bulletLifetime}");
             bulletComponent.Initialize(direction, weaponStats.bulletSpeed, weaponStats.damage, weaponStats.bulletLifetime, weaponStats.range);
-            Debug.Log("[RangedWeapon] 子弹初始化完成");
+            VerboseLog.Log("[RangedWeapon] 子弹初始化完成");
         }
         else
         {
@@ -317,11 +317,11 @@ public class RangedWeapon : MonoBehaviour
     /// </summary>
     public void StartReload()
     {
-        Debug.Log($"[RangedWeapon] StartReload - 当前弹药: {currentAmmo}, 最大弹药: {weaponStats.magazineSize}, 重装中: {isReloading}");
+        VerboseLog.Log($"[RangedWeapon] StartReload - 当前弹药: {currentAmmo}, 最大弹药: {weaponStats.magazineSize}, 重装中: {isReloading}");
         
         if (isReloading)
         {
-            Debug.Log("[RangedWeapon] 已经在重装中，强制停止当前重装并重新开始");
+            VerboseLog.Log("[RangedWeapon] 已经在重装中，强制停止当前重装并重新开始");
             // 强制停止当前重装
             CancelInvoke(nameof(CompleteReload));
             CancelInvoke(nameof(ForceCompleteReload));
@@ -330,19 +330,19 @@ public class RangedWeapon : MonoBehaviour
         
         if (currentAmmo >= weaponStats.magazineSize)
         {
-            Debug.Log("[RangedWeapon] 弹匣已满，无需重装");
+            VerboseLog.Log("[RangedWeapon] 弹匣已满，无需重装");
             return;
         }
         
         // 检查是否需要消耗背包中的子弹
         if (requireAmmoFromInventory && !CanReloadFromInventory())
         {
-            Debug.Log("[RangedWeapon] 背包中没有足够的子弹，无法重装");
+            VerboseLog.Log("[RangedWeapon] 背包中没有足够的子弹，无法重装");
             PlaySound(emptySound);
             return;
         }
         
-        Debug.Log($"[RangedWeapon] 开始重装，重装时间: {weaponStats.reloadTime}秒");
+        VerboseLog.Log($"[RangedWeapon] 开始重装，重装时间: {weaponStats.reloadTime}秒");
         isReloading = true;
         PlaySound(reloadSound);
         OnReloadStart?.Invoke();
@@ -365,7 +365,7 @@ public class RangedWeapon : MonoBehaviour
     /// </summary>
     private void CompleteReload()
     {
-        Debug.Log($"[RangedWeapon] 重装完成 - 弹药从 {currentAmmo} 恢复到 {weaponStats.magazineSize}");
+        VerboseLog.Log($"[RangedWeapon] 重装完成 - 弹药从 {currentAmmo} 恢复到 {weaponStats.magazineSize}");
         
         // 取消安全超时检查
         CancelInvoke(nameof(ForceCompleteReload));
@@ -382,7 +382,7 @@ public class RangedWeapon : MonoBehaviour
         OnReloadComplete?.Invoke();
         OnAmmoChanged?.Invoke(currentAmmo, weaponStats.magazineSize);
         
-        Debug.Log("[RangedWeapon] 重装完成，可以继续射击");
+        VerboseLog.Log("[RangedWeapon] 重装完成，可以继续射击");
     }
     
     /// <summary>
@@ -409,7 +409,7 @@ public class RangedWeapon : MonoBehaviour
             OnReloadComplete?.Invoke();
             OnAmmoChanged?.Invoke(currentAmmo, weaponStats.magazineSize);
             
-            Debug.Log("[RangedWeapon] 强制重装完成，可以继续射击");
+            VerboseLog.Log("[RangedWeapon] 强制重装完成，可以继续射击");
         }
     }
     
@@ -452,7 +452,7 @@ public class RangedWeapon : MonoBehaviour
         nextFireTime = 0f;
         OnAmmoChanged?.Invoke(currentAmmo, weaponStats.magazineSize);
         
-        Debug.Log($"[RangedWeapon] 武器统计数据已设置: {weaponStats.weaponName}, 弹匣大小: {weaponStats.magazineSize}, fireRate: {weaponStats.fireRate}, 射击间隔: {(1f/weaponStats.fireRate):F3}秒, 射击冷却重置");
+        VerboseLog.Log($"[RangedWeapon] 武器统计数据已设置: {weaponStats.weaponName}, 弹匣大小: {weaponStats.magazineSize}, fireRate: {weaponStats.fireRate}, 射击间隔: {(1f/weaponStats.fireRate):F3}秒, 射击冷却重置");
     }
     
     #region 子弹消耗系统
@@ -473,7 +473,7 @@ public class RangedWeapon : MonoBehaviour
         int neededItems = Mathf.CeilToInt((float)neededAmmo / bulletItemToAmmoRatio);
         
         bool hasEnough = inventoryManager.HasItem(bulletItem, neededItems);
-        Debug.Log($"[RangedWeapon] 检查子弹 - 需要弹药: {neededAmmo}, 需要物品: {neededItems}, 背包中有足够: {hasEnough}");
+        VerboseLog.Log($"[RangedWeapon] 检查子弹 - 需要弹药: {neededAmmo}, 需要物品: {neededItems}, 背包中有足够: {hasEnough}");
         
         return hasEnough;
     }
@@ -494,7 +494,7 @@ public class RangedWeapon : MonoBehaviour
         
         if (inventoryManager.RemoveItem(bulletItem, itemsToConsume))
         {
-            Debug.Log($"[RangedWeapon] 消耗了 {itemsToConsume}x {bulletItem.itemName} 来重装 {neededAmmo} 发子弹");
+            VerboseLog.Log($"[RangedWeapon] 消耗了 {itemsToConsume}x {bulletItem.itemName} 来重装 {neededAmmo} 发子弹");
         }
         else
         {
@@ -511,7 +511,7 @@ public class RangedWeapon : MonoBehaviour
     {
         bulletItem = item;
         bulletItemToAmmoRatio = Mathf.Max(1, ratio);
-        Debug.Log($"[RangedWeapon] 设置子弹物品: {(item != null ? item.itemName : "null")}, 比例: 1:{bulletItemToAmmoRatio}");
+        VerboseLog.Log($"[RangedWeapon] 设置子弹物品: {(item != null ? item.itemName : "null")}, 比例: 1:{bulletItemToAmmoRatio}");
     }
     
     /// <summary>
@@ -521,7 +521,7 @@ public class RangedWeapon : MonoBehaviour
     public void SetRequireAmmoFromInventory(bool require)
     {
         requireAmmoFromInventory = require;
-        Debug.Log($"[RangedWeapon] 设置子弹消耗需求: {requireAmmoFromInventory}");
+        VerboseLog.Log($"[RangedWeapon] 设置子弹消耗需求: {requireAmmoFromInventory}");
     }
     
     /// <summary>

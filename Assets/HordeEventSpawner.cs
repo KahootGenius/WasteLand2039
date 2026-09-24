@@ -61,7 +61,7 @@ public class HordeEventSpawner : MonoBehaviour
             return;
 
         // Log for debugging horde progress
-        Debug.Log($"[HordeEventSpawner.Update] Spawning: {isSpawning}, Spawned: {spawnedCount}/{currentHordeEvent.totalEnemyCount}, Active: {activeEnemies.Count}, Time since last spawn: {Time.time - lastSpawnTime:F2}s");
+        VerboseLog.Log($"[HordeEventSpawner.Update] Spawning: {isSpawning}, Spawned: {spawnedCount}/{currentHordeEvent.totalEnemyCount}, Active: {activeEnemies.Count}, Time since last spawn: {Time.time - lastSpawnTime:F2}s");
 
         // 清理已被销毁的敌人
         activeEnemies.RemoveAll(e => e == null);
@@ -89,12 +89,12 @@ public class HordeEventSpawner : MonoBehaviour
     /// </summary>
     private void HandleHordeEventTriggered(HordeEvent hordeEvent)
     {
-        Debug.LogError($"[HordeEventSpawner.HandleHordeEventTriggered] 接收到事件: {(hordeEvent != null ? hordeEvent.hordeName : "无")}, autoStart: {autoStart}");
-        Debug.LogError($"[HordeEventSpawner.HandleHordeEventTriggered] 事件详情 - 总敌人数: {(hordeEvent != null ? hordeEvent.totalEnemyCount.ToString() : "N/A")}, 最大活跃数: {(hordeEvent != null ? hordeEvent.maxActiveEnemies.ToString() : "N/A")}");
+        VerboseLog.Log($"[HordeEventSpawner.HandleHordeEventTriggered] 接收到事件: {(hordeEvent != null ? hordeEvent.hordeName : "无")}, autoStart: {autoStart}");
+        VerboseLog.Log($"[HordeEventSpawner.HandleHordeEventTriggered] 事件详情 - 总敌人数: {(hordeEvent != null ? hordeEvent.totalEnemyCount.ToString() : "N/A")}, 最大活跃数: {(hordeEvent != null ? hordeEvent.maxActiveEnemies.ToString() : "N/A")}");
         
         if (!autoStart || hordeEvent == null)
         {
-            Debug.LogError($"[HordeEventSpawner.HandleHordeEventTriggered] 不启动事件 - autoStart: {autoStart}, hordeEvent为null: {hordeEvent == null}");
+            VerboseLog.Log($"[HordeEventSpawner.HandleHordeEventTriggered] 不启动事件 - autoStart: {autoStart}, hordeEvent为null: {hordeEvent == null}");
             return;
         }
 
@@ -112,8 +112,8 @@ public class HordeEventSpawner : MonoBehaviour
             return;
         }
 
-        Debug.LogError($"[HordeEventSpawner.StartHordeEvent] 正在启动事件: {hordeEvent.hordeName}. 总数: {hordeEvent.totalEnemyCount}, 间隔: {hordeEvent.spawnInterval}, 半径: {hordeEvent.spawnRadius}");
-        Debug.LogError($"[HordeEventSpawner.StartHordeEvent] 玩家位置: {(playerTransform != null ? playerTransform.position.ToString() : "null")}, 最小生成距离: {hordeEvent.minSpawnDistance}");
+        VerboseLog.Log($"[HordeEventSpawner.StartHordeEvent] 正在启动事件: {hordeEvent.hordeName}. 总数: {hordeEvent.totalEnemyCount}, 间隔: {hordeEvent.spawnInterval}, 半径: {hordeEvent.spawnRadius}");
+        VerboseLog.Log($"[HordeEventSpawner.StartHordeEvent] 玩家位置: {(playerTransform != null ? playerTransform.position.ToString() : "null")}, 最小生成距离: {hordeEvent.minSpawnDistance}");
 
         currentHordeEvent = hordeEvent;
         isSpawning = true;
@@ -121,7 +121,7 @@ public class HordeEventSpawner : MonoBehaviour
         lastSpawnTime = 0f;
         activeEnemies.Clear();
 
-        Debug.LogError($"[HordeEventSpawner.StartHordeEvent] 事件已启动，isSpawning: {isSpawning}, spawnedCount: {spawnedCount}");
+        VerboseLog.Log($"[HordeEventSpawner.StartHordeEvent] 事件已启动，isSpawning: {isSpawning}, spawnedCount: {spawnedCount}");
 
         OnHordeEventStarted?.Invoke(hordeEvent);
     }
