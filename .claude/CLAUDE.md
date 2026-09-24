@@ -14,7 +14,8 @@ Everything Claude (or any AI agent) produces that is *not* a change to the game 
 ├── agents/              (create when needed) custom subagents
 ├── commands/            (create when needed) custom slash commands
 ├── skills/              (create when needed) project skills
-└── workspace/
+├── tools/               helper scripts for agents (see below)
+└── workspace/           (scratch/ and backups/ are git-ignored)
     ├── reports/         scans, reviews, investigations, write-ups  → YYYY-MM-DD-<topic>.md
     ├── plans/           implementation plans, task breakdowns       → YYYY-MM-DD-<topic>.md
     ├── backups/         copies of files taken before risky edits    → YYYY-MM-DD-<topic>/
@@ -32,7 +33,11 @@ Real game changes (scripts, prefabs, scenes, ScriptableObjects) still go in thei
 - **Input:** legacy Input Manager (`Input.GetKeyDown`, etc.). The new Input System package is **not** installed.
 - **UI:** a mix of `UnityEngine.UI.Text` and TextMeshPro.
 - **Language:** code comments, `Debug.Log` messages, and design docs are in **Chinese**. Match that style when editing.
-- **No version control:** not a git repo. Take a backup into `.claude/workspace/backups/` before any large or risky edit.
+- **Git** (since 2026-09-24, local only, no remote):
+  - `main` is the game as of 2026-09-24. The user's own work belongs there.
+  - `experiment/enemy-ml` holds the ML enemy experiment (see Active work). Keep experiment commits off `main`.
+  - Commit only when the user asks. Keep commits small and single-purpose so fixes can be cherry-picked to `main`.
+- **Logging:** high-frequency info logs use `VerboseLog.Log(...)` (in `Assets/Scripts/VerboseLog.cs`). It is compiled out unless the `VERBOSE_LOGS` scripting define is set. Use `Debug.LogWarning` / `Debug.LogError` only for real problems. *(Currently on `experiment/enemy-ml` only.)*
 - **IDE:** Visual Studio / VS Code (`Waste Land 2039.sln`). Rider is also enabled in packages.
 
 ### Code map (`Assets/`)
@@ -55,15 +60,24 @@ Scenes and flow: `Assets/MainMenu.unity` → `Assets/IntroScene.unity` (used as 
 - Note: a bare `using UnityEditor;` in runtime code does **not** break player builds (the player `UnityEngine.CoreModule.dll` defines that namespace). Only actual editor API calls outside `#if UNITY_EDITOR` do. Don't flag the bare `using` as a build breaker.
 - `Assets/Resources/` is 162 MB and ships in full. `ZombieWar/` (156 MB) is almost entirely unreferenced. Don't add more to Resources unless the asset is loaded by name in code.
 - `Resources.LoadAll<Item>("")` finds nothing, because `Item` assets live in `Assets/Items/`. The `GameManager` / `GameDataManager` prefabs that `SceneController` loads from Resources don't exist.
-- **Spawn bug:** `HordeEventSpawner.RandomPointOnRing` returns `(cos, 0, sin)`, the X/Z plane. In this 2D (X/Y) game, enemies spawn on a horizontal line through the player, not in a ring.
-- **Log spam:** `HordeEventSpawner.Update` logs every frame while spawning, and `Enemy` logs every hit and state change. That's fine in normal play, but it cripples fast-forwarded (ML training) runs.
+- **Spawn bug:** `HordeEventSpawner.RandomPointOnRing` used `(cos, 0, sin)`, the X/Z plane, so enemies spawned on a horizontal line through the player. **Fixed on `experiment/enemy-ml` only** (commit "Fix horde spawn ring…"); cherry-pick it to `main` if wanted.
+- **Log spam:** fixed on `experiment/enemy-ml` via `VerboseLog`. Still present on `main`.
 - `SceneController.InitializeSceneSpecificSystems` has `case "GameScene":`, but the game scene is `MainGame`, so that branch never runs. It currently does nothing useful anyway (see the missing `GameManager` prefab above).
 - `HordeEvent_使用说明.txt` (project root) describes `DayManager` / `HordeSpawner`, which have since been removed or commented out. Horde config now lives on `GameTimer.dayHordeEvents`.
 - There are about 21 debug, fixer, tester, and demo scripts in `InventorySystem/`. The fixer scripts checked are not referenced by any scene, so they are likely leftovers.
 
 ## Active work
 
-- **Learning enemies (V1 = RL, V2 = TBD) for comparative analysis.** Plan: `workspace/plans/2026-09-24-enemy-ml-v1-rl.md` (draft, awaiting approval; nothing implemented yet). Training files will live in `MLTraining/` at the repo root, outside `Assets/`.
+- **Learning enemies, for comparative analysis only.** Branch `experiment/enemy-ml`. Plan: `workspace/plans/2026-09-24-enemy-ml-v1-rl.md`.
+  - **V1** = RL commander (ML-Agents PPO).
+  - **V2** = supervised escape-zone prediction plus scripted squad tactics (option a).
+  - **Status:** Phase 0 done 2026-09-24; Phase 1 (order API + swappable commander) is next.
+  - The user says this is **experimental**. They have **another design of their own that they expect to perform better**. Keep the ML work isolated (new files, thin hooks, experiment branch), and don't push it into `main` or into their design.
+  - Training files will live in `MLTraining/` at the repo root, outside `Assets/`.
+
+## Tools
+
+- `.claude/tools/compile-check.sh` compiles `Assembly-CSharp` with Unity's bundled Roslyn twice: as the Editor would and as a macOS player build would. It takes about 4 s and works whether Unity is open or closed. Run it after every C# change and report the result. Baseline on 2026-09-24: 0 errors, 7 warnings in each version. It needs Unity to have compiled the project at least once, since it reads `Library/Bee/.../Assembly-CSharp.rsp`.
 
 ## Working rules for agents
 
@@ -71,5 +85,6 @@ Scenes and flow: `Assets/MainMenu.unity` → `Assets/IntroScene.unity` (used as 
 2. **`.meta` files:** when moving or renaming anything under `Assets/`, move or rename its `.meta` file with it. Deleting or regenerating a `.meta` file breaks every reference to that asset's GUID. Prefer doing moves inside the Unity Editor.
 3. **Scenes and prefabs** (`.unity`, `.prefab`) are YAML. Only hand-edit them for small, well-understood changes. Otherwise describe the Editor steps to the user. The Unity Editor is often open (`Temp/UnityLockfile` exists). If you edit a scene on disk while it's open in the Editor, the Editor may overwrite your change on its next save, so ask the user to close that scene first.
 4. **ScriptableObject configs** (`HordeEvent`, `Item`, `CraftingRecipe`, `SurvivalManualData`) are the source of truth for tuning. Change data there rather than hard-coding values.
-5. **Can't run the game or compile from here.** Say what you changed and what the user should check in the Editor (Console errors, Play mode).
-6. **Reports and plans** go in `.claude/workspace/reports|plans/` with a date prefix, not in chat-only or project-root files.
+5. **You can compile but not play.** Use `.claude/tools/compile-check.sh` to verify compilation. You still can't run Play mode, so say what you changed and what the user should check in the Editor.
+6. **New assets need `.meta` files.** When creating a new script or folder under `Assets/`, also create its `.meta` with a fresh GUID (copy the format from a sibling `.meta`), so the commit is complete before Unity next opens.
+7. **Reports and plans** go in `.claude/workspace/reports|plans/` with a date prefix, not in chat-only or project-root files.

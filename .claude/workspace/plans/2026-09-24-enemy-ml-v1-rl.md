@@ -1,6 +1,8 @@
 # Plan: learning enemies, V1 (reinforcement learning)
 
-*2026-09-24. Status: **draft, awaiting approval**. Nothing implemented yet.*
+*2026-09-24. Status: **approved; Phase 0 done** (branch `experiment/enemy-ml`). V2 = option (a).*
+
+> **Scope note from the user:** this is **experimental, for comparative analysis only**. The user has another design of their own that they expect to perform better. Keep the ML work isolated: new files, thin hooks into existing code, and the experiment branch only. If useful later, the user's design can plug into the same `IHordeCommander` seam as another comparison arm, but only if they want that.
 
 ## 1. Verdict
 
@@ -47,7 +49,7 @@ RL controls the **commander** (one decision-maker per horde), **not individual z
 `IHordeCommander` has interchangeable implementations, selected by a config ScriptableObject:
 - `BaselineCommander`: reproduces today's behavior (spawn around the player, chase, go to base). It's the control group.
 - `RLCommander` (**V1**): ML-Agents agent running the trained `.onnx` model.
-- `V2Commander`: TBD (see §8).
+- `V2Commander` (**V2**, option a): predicts the player's escape zone with a supervised model (Markov/n-gram or small classifier trained on logged play); scripted rules send squads there.
 
 All commanders get **the same observations and the same order API**. Only the "brain" differs, so the comparison is fair.
 
@@ -96,7 +98,7 @@ Lightweight fallback: if the Python stack fights back, the same commander can be
 
 | Phase | Deliverables | Exit criteria | Rough size |
 |---|---|---|---|
-| **0. Groundwork** | Git init + Unity `.gitignore`; fix spawn-ring bug; gate the log spam behind a debug flag; "endless waves" test mode | Clean commit; hordes spawn in a real ring; 20× time scale runs smoothly | 1–2 days |
+| **0. Groundwork** ✅ | Git init + Unity `.gitignore`; fix spawn-ring bug; gate the log spam behind a debug flag; "endless waves" test mode | Clean commit; hordes spawn in a real ring; 20× time scale runs smoothly | **Done 2026-09-24**, see §10 |
 | **1. Order API + commander seam** | `Enemy` order states (MoveTo / HoldAmbush / Chase); `Squad`; spawner accepts commander spawn requests; `IHordeCommander`; `BaselineCommander` | Game plays the same as today through the baseline commander | ~1 week |
 | **2. Zones, profiler, telemetry** | `ZoneMarker`/`ZoneMap`; `EngagementTracker` (fight/flee classifier); `PlayerProfiler`; `TelemetryLogger` (CSV/JSONL to `Application.persistentDataPath`) | You play 10 min deliberately "fighting", then 10 min "fleeing east", and the profiler reports both correctly | ~1 week |
 | **3. Arena + bot personas** | `MLArena` scene (3–4 exit routes, replicated ×8); input abstraction so `PlayerController`/`WeaponManager` can be driven by a bot; persona ScriptableObjects | Each persona produces the expected profile in the profiler | ~1 week |
@@ -121,7 +123,7 @@ Sizes are rough solo estimates and will firm up after Phase 1.
 
 ## 8. Open questions (needed before Phase 4)
 
-1. **What is V2?** Suggested options that make a clean contrast with V1:
+1. ~~**What is V2?**~~ **Decided 2026-09-24: option (a)**, supervised escape-zone prediction plus scripted squad tactics. The options considered were:
    - **(a) Supervised prediction + scripted tactics:** a model (Markov/n-gram or a small classifier trained on logged play) predicts the next escape zone, and hand-written rules deploy squads there. This compares "learn to act" (RL) with "learn to predict, then rules act". **Recommended.**
    - **(b) Online tabular RL:** Q-learning or a contextual bandit in C# that learns *during* play. This compares offline deep RL with online lightweight RL.
    - (c) Something you already have in mind.
@@ -143,3 +145,18 @@ Sizes are rough solo estimates and will firm up after Phase 1.
 - ML-Agents releases (versions and minimum Unity per release): https://github.com/Unity-Technologies/ml-agents/releases
 - Release 21 installation requirements (Unity 2022.3+, Python 3.10.12): https://github.com/Unity-Technologies/ml-agents/blob/release_21/docs/Installation.md
 - Apple Silicon setup notes (grpcio via conda, protobuf ~3.20, numpy<1.24): https://jackmckew.dev/ml-agents-for-unity-on-apple-silicon-m1m2m3
+
+## 10. Progress log
+
+### Phase 0: done 2026-09-24
+- `main` (b533bbd): initial snapshot of the game, including the day's three earlier fixes. `.gitignore` covers Unity-generated folders; `.claude/.gitignore` keeps `workspace/scratch/` and `workspace/backups/` local.
+- `experiment/enemy-ml`:
+  - **Spawn ring fix.** `RandomPointOnRing` now uses X/Y. It's a single commit, so it can be cherry-picked to `main`.
+  - **`VerboseLog`.** A `[Conditional("VERBOSE_LOGS")]` helper; 110 calls in 10 combat-loop scripts were converted: all `Debug.Log`, plus 14 routine messages that used `Debug.LogError`. Checked in the compiled player DLL: gated strings are absent and real error strings are still present.
+  - **Endless waves.** `HordeEventSpawner.endlessWaves` (off by default) and `endlessWaveDelay`, plus a `CompletedWaves` counter.
+- **Verified:** `.claude/tools/compile-check.sh` shows both Editor and player builds at 0 errors and 7 warnings (same as baseline).
+- **Not yet verified (needs the Unity Editor):**
+  - Hordes visibly spawn in a ring.
+  - The Console is quiet during combat.
+  - Endless mode restarts waves.
+  - The game runs smoothly at a raised `Time.timeScale`.
