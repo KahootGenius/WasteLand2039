@@ -15,6 +15,8 @@ public class HordeEventSpawner : MonoBehaviour
     [Header("引用")]
     public GameTimer gameTimer;      // 关联的GameTimer（从中接收事件）
     public Transform playerTransform; // 玩家位置（作为生成中心）
+    [Tooltip("主基地。为空时按 MainBase 标签 / 组件查找（原版行为）")]
+    public Transform mainBaseTransform;
 
     [Header("行为")]
     public bool autoStart = true;    // 收到事件后是否自动开始
@@ -24,6 +26,9 @@ public class HordeEventSpawner : MonoBehaviour
     public bool endlessWaves = false;
     [Tooltip("无尽模式下两波之间的间隔（秒，受 Time.timeScale 影响）")]
     public float endlessWaveDelay = 3f;
+    [Tooltip("把本生成器的玩家和基地直接指定给生成的敌人，代替敌人按标签全局查找。" +
+             "同一场景有多个玩家 / 基地（ML 训练场）时必须开启。默认关闭，不影响正常游戏")]
+    public bool bindEnemiesToSpawner = false;
 
     [Header("指挥官（敌人AI）")]
     [Tooltip("实现 IHordeCommander 的组件。为空时自动使用本物体上的指挥官组件；都没有则添加 BaselineCommander（原版行为）")]
@@ -48,8 +53,11 @@ public class HordeEventSpawner : MonoBehaviour
     private readonly List<GameObject> activeEnemies = new List<GameObject>();
     private int completedWaves = 0;
 
-    /// <summary>已完成的尸潮波数（无尽模式下持续累加）</summary>
+    /// <summary>已结束的尸潮波数（含被中止的；无尽模式下持续累加）</summary>
     public int CompletedWaves => completedWaves;
+
+    /// <summary>当前是否有尸潮在进行（生成中或还有存活敌人）</summary>
+    public bool IsWaveActive => isSpawning;
 
     // 事件（可选回调）
     public delegate void HordeEventStartedEvent(HordeEvent hordeEvent);
@@ -57,6 +65,9 @@ public class HordeEventSpawner : MonoBehaviour
 
     public delegate void HordeEventCompletedEvent(HordeEvent hordeEvent);
     public event HordeEventCompletedEvent OnHordeEventCompleted;
+
+    /// <summary>尸潮被 AbortHordeEvent 中止（敌人被直接移除，而不是被消灭）</summary>
+    public event HordeEventCompletedEvent OnHordeEventAborted;
 
     public delegate void EnemySpawnedEvent(GameObject enemy);
     public event EnemySpawnedEvent OnEnemySpawned;
@@ -98,7 +109,7 @@ public class HordeEventSpawner : MonoBehaviour
         context = new HordeContext(activeEnemies)
         {
             Player = playerTransform,
-            MainBase = FindMainBase(),
+            MainBase = mainBaseTransform != null ? mainBaseTransform : FindMainBase(),
             Zones = zones,
             Profile = profile,
             Engagement = engagement
@@ -253,6 +264,31 @@ public class HordeEventSpawner : MonoBehaviour
         }
     }
 
+    /// <summary>
+    /// 立即结束当前尸潮并移除场上敌人（ML 训练场的回合超时 / 玩家死亡重置用）。
+    /// 与正常结束的区别：触发 OnHordeEventAborted 而不是 OnHordeEventCompleted，且不会触发无尽模式的自动重开
+    /// </summary>
+    public void AbortHordeEvent()
+    {
+        if (!isSpawning)
+            return;
+
+        foreach (var enemy in activeEnemies)
+        {
+            if (enemy != null)
+                Destroy(enemy);
+        }
+        activeEnemies.Clear();
+
+        isSpawning = false;
+        var abortedEvent = currentHordeEvent;
+        currentHordeEvent = null;
+        completedWaves++;
+        commander.OnWaveCompleted(context);
+        context.Wave = null;
+        OnHordeEventAborted?.Invoke(abortedEvent);
+    }
+
     private IEnumerator RestartWaveAfterDelay(HordeEvent hordeEvent)
     {
         yield return new WaitForSeconds(endlessWaveDelay);
@@ -288,7 +324,11 @@ public class HordeEventSpawner : MonoBehaviour
 
             var enemyComponent = enemy.GetComponent<Enemy>();
             if (enemyComponent != null)
+            {
+                if (bindEnemiesToSpawner)
+                    enemyComponent.AssignTargets(playerTransform, context.MainBase);
                 commander.OnEnemySpawned(context, enemyComponent);
+            }
 
             OnEnemySpawned?.Invoke(enemy);
         }

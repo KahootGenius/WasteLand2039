@@ -20,6 +20,12 @@ public class PlayerBehaviourMonitor : MonoBehaviour
     [SerializeField] private HordeEventSpawner spawner;
     [SerializeField] private PlayerController player;
     [SerializeField] private WeaponManager weaponManager;
+    [Tooltip("主基地。为空时使用生成器指定的基地，再为空则按 MainBase 标签 / 组件查找")]
+    [SerializeField] private Transform mainBaseOverride;
+
+    [Header("训练场")]
+    [Tooltip("只统计本生成器生成的敌人（同一场景有多个训练场时必须开启）。默认统计场景中所有敌人")]
+    [SerializeField] private bool trackSpawnerEnemiesOnly = false;
 
     [Header("分区（以主基地为中心；找不到基地时以玩家初始位置为中心）")]
     [SerializeField] private int zoneSectors = 8;
@@ -41,6 +47,7 @@ public class PlayerBehaviourMonitor : MonoBehaviour
     [SerializeField] private string sessionTag = "";
 
     [Header("调试显示")]
+    [Tooltip("切换调试面板的按键；None = 不响应按键（由其他脚本通过 ShowOverlay 控制）")]
     [SerializeField] private KeyCode overlayKey = KeyCode.BackQuote;
     [SerializeField] private bool showOverlay = false;
     [SerializeField] private bool drawZoneGizmos = true;
@@ -48,7 +55,24 @@ public class PlayerBehaviourMonitor : MonoBehaviour
     public IZoneMap Zones => zoneMap;
     public EngagementTracker Tracker => tracker;
     public PlayerProfile Profile => profile;
+    public PlayerController Player => player;
     public string TelemetryDirectory => telemetry != null ? telemetry.DirectoryPath : null;
+
+    /// <summary>会话目录名标签。只在 Start 之前设置有效（遥测目录在 Start 中创建）</summary>
+    public string SessionTag
+    {
+        get => sessionTag;
+        set => sessionTag = value;
+    }
+
+    public bool ShowOverlay
+    {
+        get => showOverlay;
+        set => showOverlay = value;
+    }
+
+    /// <summary>附加在调试面板末尾的文字（训练场用来显示机器人状态）</summary>
+    public System.Func<string> OverlayExtra { get; set; }
 
     /// <summary>所有会话目录的父目录</summary>
     public static string TelemetryRoot => Path.Combine(Application.persistentDataPath, "EnemyAITelemetry");
@@ -106,7 +130,11 @@ public class PlayerBehaviourMonitor : MonoBehaviour
             return;
         }
 
-        Transform mainBase = FindMainBase();
+        Transform mainBase = mainBaseOverride;
+        if (mainBase == null && spawner != null)
+            mainBase = spawner.mainBaseTransform;
+        if (mainBase == null)
+            mainBase = FindMainBase();
         Vector2 center = mainBase != null ? (Vector2)mainBase.position : (Vector2)player.transform.position;
         zoneMap = new RadialZoneMap(center, zoneSectors, coreRadius, bandEdges);
 
@@ -133,6 +161,7 @@ public class PlayerBehaviourMonitor : MonoBehaviour
             spawner.AttachPlayerModel(zoneMap, profile, tracker);
             spawner.OnHordeEventStarted += HandleWaveStarted;
             spawner.OnHordeEventCompleted += HandleWaveCompleted;
+            spawner.OnHordeEventAborted += HandleWaveAborted;
             spawner.OnEnemySpawned += HandleEnemySpawned;
         }
 
@@ -145,7 +174,7 @@ public class PlayerBehaviourMonitor : MonoBehaviour
 
     private void Update()
     {
-        if (Input.GetKeyDown(overlayKey))
+        if (overlayKey != KeyCode.None && Input.GetKeyDown(overlayKey))
             showOverlay = !showOverlay;
     }
 
@@ -188,12 +217,28 @@ public class PlayerBehaviourMonitor : MonoBehaviour
         lastHealth = health;
 
         enemyPositions.Clear();
-        IReadOnlyList<Enemy> enemies = Enemy.AllActive;
-        for (int i = 0; i < enemies.Count; i++)
+        if (trackSpawnerEnemiesOnly)
         {
-            Enemy enemy = enemies[i];
-            if (enemy != null && !enemy.IsDead && enemy.IsMovingEnemy())
-                enemyPositions.Add(enemy.transform.position);
+            IReadOnlyList<GameObject> spawned = spawner != null && spawner.Context != null ? spawner.Context.ActiveEnemies : null;
+            if (spawned != null)
+            {
+                for (int i = 0; i < spawned.Count; i++)
+                {
+                    Enemy enemy = spawned[i] != null ? spawned[i].GetComponent<Enemy>() : null;
+                    if (enemy != null && !enemy.IsDead && enemy.IsMovingEnemy())
+                        enemyPositions.Add(enemy.transform.position);
+                }
+            }
+        }
+        else
+        {
+            IReadOnlyList<Enemy> enemies = Enemy.AllActive;
+            for (int i = 0; i < enemies.Count; i++)
+            {
+                Enemy enemy = enemies[i];
+                if (enemy != null && !enemy.IsDead && enemy.IsMovingEnemy())
+                    enemyPositions.Add(enemy.transform.position);
+            }
         }
 
         var sample = new PlayerSample
@@ -247,6 +292,9 @@ public class PlayerBehaviourMonitor : MonoBehaviour
 
     private void HandleEnemyDied(Enemy enemy)
     {
+        if (trackSpawnerEnemiesOnly && !IsOwnEnemy(enemy))
+            return;
+
         tracker.NotifyKill();
         if (telemetry == null || enemy == null)
             return;
@@ -291,6 +339,15 @@ public class PlayerBehaviourMonitor : MonoBehaviour
     {
         telemetry?.Event("wave_end", Time.time).Add("wave", waveIndex).Write();
         WriteProfileSnapshot("wave_end");
+    }
+
+    private void HandleWaveAborted(HordeEvent hordeEvent)
+    {
+        // 敌人被直接移除（不是被消灭或甩开）：强制结束交战，避免被记为"成功脱离"
+        if (tracker.IsEngaged)
+            tracker.ForceEnd(lastSample);
+        telemetry?.Event("wave_abort", Time.time).Add("wave", waveIndex).Write();
+        WriteProfileSnapshot("wave_abort");
     }
 
     private void HandleEngagementStarted(EngagementSummary engagement)
@@ -417,6 +474,7 @@ public class PlayerBehaviourMonitor : MonoBehaviour
                 .Add("retreat_ratio", engagementSettings.retreatRatio)
                 .Add("shooting_rate", engagementSettings.shootingRate)
                 .Add("min_escape_seconds", engagementSettings.minEscapeSeconds)
+                .Add("kite_gap_seconds", engagementSettings.kiteGapSeconds)
                 .Add("engagement_decay", profileSettings.engagementDecay)
                 .Add("escape_decay", profileSettings.escapeDecay)
                 .ToString();
@@ -429,6 +487,56 @@ public class PlayerBehaviourMonitor : MonoBehaviour
             Debug.LogWarning($"[PlayerBehaviourMonitor] 无法创建遥测目录，本次不记录: {exception.Message}", this);
             telemetry = null;
         }
+    }
+
+    // ---------- 训练场接口 ----------
+
+    /// <summary>
+    /// 清空玩家画像（训练场：每个回合换一组随机化的机器人参数时调用）。
+    /// 进行中的交战被强制结束并计入旧画像；遥测继续写入同一会话目录，并记录 profile_reset 事件
+    /// </summary>
+    public void ResetProfile(string reason)
+    {
+        if (tracker == null)
+            return;
+
+        if (tracker.IsEngaged)
+            tracker.ForceEnd(lastSample);
+        WriteProfileSnapshot("before_reset");
+
+        profile = new PlayerProfile(zoneMap.ZoneCount, profileSettings);
+        if (spawner != null)
+            spawner.AttachPlayerModel(zoneMap, profile, tracker);
+        telemetry?.Event("profile_reset", Time.time).Add("reason", reason).Write();
+    }
+
+    /// <summary>
+    /// 写一条自定义事件到 events.jsonl（用 .Add(...) 追加字段，最后 .Write()）。
+    /// 未记录遥测时返回不写入任何地方的空构建器，调用方无需判空
+    /// </summary>
+    public JsonLine LogEvent(string type)
+    {
+        return telemetry != null ? telemetry.Event(type, Time.time) : JsonLine.Standalone();
+    }
+
+    /// <summary>写一条当前画像快照（profile 事件）</summary>
+    public void LogProfileSnapshot(string reason)
+    {
+        WriteProfileSnapshot(reason);
+    }
+
+    private bool IsOwnEnemy(Enemy enemy)
+    {
+        if (enemy == null || spawner == null || spawner.Context == null)
+            return false;
+
+        IReadOnlyList<GameObject> spawned = spawner.Context.ActiveEnemies;
+        for (int i = 0; i < spawned.Count; i++)
+        {
+            if (spawned[i] == enemy.gameObject)
+                return true;
+        }
+        return false;
     }
 
     private void WriteProfileSnapshot(string reason)
@@ -469,6 +577,7 @@ public class PlayerBehaviourMonitor : MonoBehaviour
         {
             spawner.OnHordeEventStarted -= HandleWaveStarted;
             spawner.OnHordeEventCompleted -= HandleWaveCompleted;
+            spawner.OnHordeEventAborted -= HandleWaveAborted;
             spawner.OnEnemySpawned -= HandleEnemySpawned;
         }
 
@@ -547,11 +656,12 @@ public class PlayerBehaviourMonitor : MonoBehaviour
         }
 
         string text =
-            $"敌人AI监测  （按 {overlayKey} 隐藏）\n" +
+            "敌人AI监测" + (overlayKey != KeyCode.None ? $"  （按 {overlayKey} 隐藏）" : "") + "\n" +
             $"指挥官: {CommanderName()}   波次: {waveIndex}   区域: {zoneMap.GetZoneName(tracker.CurrentZone)}\n" +
             $"状态: {tracker.State}   交战 #{tracker.CurrentEngagementId}   撤退 {tracker.RetreatRatio:F2}   射速 {tracker.ShotRate:F1}/s\n" +
             "—— 玩家画像 ——\n" +
             profile.Describe(zoneMap) +
+            (OverlayExtra != null ? OverlayExtra() + "\n" : "") +
             (telemetry != null ? $"遥测: {telemetry.DirectoryPath}" : "遥测: 未记录");
 
         const float width = 520f;

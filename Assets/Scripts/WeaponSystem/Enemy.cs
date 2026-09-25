@@ -161,9 +161,9 @@ public partial class Enemy : MonoBehaviour, IDamageable // 命令扩展见 Enemy
         // 如果是移动敌人，启动AI
         if (isMovingEnemy)
         {
-            // 查找玩家和主基地
-            FindPlayer();
-            FindMainBase();
+            // 查找玩家和主基地（已由生成器指定时跳过，见 EnemyAI/Enemy.Targets.cs）
+            if (player == null) FindPlayer();
+            if (mainBase == null) FindMainBase();
             
             // 启动寻路协程
             if (player != null || mainBase != null)
