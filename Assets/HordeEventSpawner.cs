@@ -32,6 +32,11 @@ public class HordeEventSpawner : MonoBehaviour
     private IHordeCommander commander;
     private HordeContext context;
 
+    // 玩家模型（由 PlayerBehaviourMonitor 通过 AttachPlayerModel 提供）
+    private IZoneMap zones;
+    private PlayerProfile profile;
+    private EngagementTracker engagement;
+
     public IHordeCommander Commander => commander;
     public HordeContext Context => context;
 
@@ -93,7 +98,10 @@ public class HordeEventSpawner : MonoBehaviour
         context = new HordeContext(activeEnemies)
         {
             Player = playerTransform,
-            MainBase = FindMainBase()
+            MainBase = FindMainBase(),
+            Zones = zones,
+            Profile = profile,
+            Engagement = engagement
         };
 
         if (commanderComponent is IHordeCommander assigned)
@@ -110,6 +118,23 @@ public class HordeEventSpawner : MonoBehaviour
         }
 
         VerboseLog.Log($"[HordeEventSpawner] 指挥官: {commander.DisplayName}");
+    }
+
+    /// <summary>
+    /// 接入玩家模型，使指挥官可以通过 HordeContext 读取分区、画像和交战状态
+    /// </summary>
+    public void AttachPlayerModel(IZoneMap zoneMap, PlayerProfile playerProfile, EngagementTracker tracker)
+    {
+        zones = zoneMap;
+        profile = playerProfile;
+        engagement = tracker;
+
+        if (context != null)
+        {
+            context.Zones = zoneMap;
+            context.Profile = playerProfile;
+            context.Engagement = tracker;
+        }
     }
 
     private static Transform FindMainBase()

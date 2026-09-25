@@ -28,6 +28,14 @@ public class HordeContext
     /// <summary>本波存活的敌人（只读视图）</summary>
     public IReadOnlyList<GameObject> ActiveEnemies { get; }
 
+    // 玩家模型（由 PlayerBehaviourMonitor 提供；未启用时为 null）
+    /// <summary>地图分区</summary>
+    public IZoneMap Zones { get; internal set; }
+    /// <summary>玩家画像：学到的战斗/逃跑偏好与逃跑路线</summary>
+    public PlayerProfile Profile { get; internal set; }
+    /// <summary>实时交战状态与事件（逃跑开始等，可用于事件驱动的决策）</summary>
+    public EngagementTracker Engagement { get; internal set; }
+
     /// <summary>
     /// 原版生成规则：玩家周围 [minSpawnDistance, spawnRadius] 环带内的随机点（XY平面）。
     /// 消耗两次 Random 调用，与原版顺序一致。
