@@ -1,0 +1,5 @@
+{
+  "env": {
+    "UNITY_MCP_DISABLE_TELEMETRY": "true"
+  }
+}
