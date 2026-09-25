@@ -97,13 +97,15 @@ Scenes and flow: `Assets/MainMenu.unity` → `Assets/IntroScene.unity` (used as 
 
 - `.claude/tools/logic-tests.sh` builds the pure EnemyAI logic (zones, player model, telemetry writer) together with `.claude/tools/logic-tests/LogicTests.cs`, and runs it outside Unity with Unity's .NET 6 runtime. The tests are simulated fighter, runner, kiter and adaptation players, plus a file-format check under a comma-decimal locale. It takes about 5 s. Run it after touching `EnemyAI/Zones`, `PlayerModel` or `Telemetry`, and extend it when you add logic. Only classes that don't use Unity engine internals (`Time`, `Debug`, scene objects) can be tested this way, so keep new decision logic in that style.
 
-- **Unity MCP** (MCP for Unity by CoplayDev, **v10.2.0**, experiment branch only; installed 2026-09-25). Tools appear as `mcp__UnityMCP__*` in sessions started after setup. Unity must be open for them to work.
+- **Unity MCP** (MCP for Unity by CoplayDev, **v10.2.0**, experiment branch only; installed and verified end to end on 2026-09-25: 47 tools, bridge on `127.0.0.1:6400`). Tools appear as `mcp__UnityMCP__*` in sessions started after setup. Unity must be open for them to work.
   - **Package:** `com.coplaydev.unity-mcp` is pinned in `Packages/manifest.json`. Don't bump it casually: a version change makes the plugin rewrite the Claude registration, and the rewrite drops the telemetry opt-out.
   - **Claude Code registration:** local scope (stored in `~/.claude.json`, not in the repo), **stdio** transport, command `uvx --from mcpforunityserver==10.2.0 mcp-for-unity --transport stdio`, env `UNITY_MCP_DISABLE_TELEMETRY=true`. `.claude/settings.json` sets the same variable as a fallback.
   - **Telemetry:** the server sends usage telemetry to `api-prod.coplay.dev` **by default**. Keep the opt-out in place.
   - **Unity side:** *Window > MCP for Unity* must stay on **Transport: stdio**. If you switch to HTTP, the plugin re-registers Claude Code over HTTP without the opt-out. The stdio bridge auto-starts when the Editor loads; after changing transport, press **Start Session**.
   - **Don't press *Install Skills*.** It writes a global skill to `~/.claude/skills/`.
   - **Claude Desktop:** the plugin's first-run wizard also added a `unityMCP` entry to Claude Desktop's `claude_desktop_config.json`, with no telemetry opt-out. See the Active work notes for what the user decided.
+
+- `.claude/tools/unity-mcp-call.py` is a minimal stdio MCP client. It launches the UnityMCP server exactly as Claude Code does (telemetry off) and lists or calls tools, for example `python3 .claude/tools/unity-mcp-call.py call read_console '{"action":"get","types":["error"]}'`. Use it when the `mcp__UnityMCP__*` tools aren't loaded in the current session. Unity must be open with an active stdio session.
 
 ## Working rules for agents
 
