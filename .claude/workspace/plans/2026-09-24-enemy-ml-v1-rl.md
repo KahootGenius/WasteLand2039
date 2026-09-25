@@ -1,6 +1,6 @@
 # Plan: learning enemies, V1 (reinforcement learning)
 
-*2026-09-24. Status: **approved; Phases 0–2 done** (branch `experiment/enemy-ml`). V2 = option (a).*
+*2026-09-24. Status: **approved; Phases 0–3 done** (branch `experiment/enemy-ml`). V2 = option (a).*
 
 > **Scope note from the user:** this is **experimental, for comparative analysis only**. The user has another design of their own that they expect to perform better. Keep the ML work isolated: new files, thin hooks into existing code, and the experiment branch only. If useful later, the user's design can plug into the same `IHordeCommander` seam as another comparison arm, but only if they want that.
 
@@ -101,7 +101,7 @@ Lightweight fallback: if the Python stack fights back, the same commander can be
 | **0. Groundwork** ✅ | Git init + Unity `.gitignore`; fix spawn-ring bug; gate the log spam behind a debug flag; "endless waves" test mode | Clean commit; hordes spawn in a real ring; 20× time scale runs smoothly | **Done 2026-09-24**, see §10 |
 | **1. Order API + commander seam** ✅ | `Enemy` order states (MoveTo / HoldAmbush / Chase); `Squad`; spawner accepts commander spawn requests; `IHordeCommander`; `BaselineCommander` | Game plays the same as today through the baseline commander | ~1 week |
 | **2. Zones, profiler, telemetry** ✅ | `ZoneMarker`/`ZoneMap`; `EngagementTracker` (fight/flee classifier); `PlayerProfiler`; `TelemetryLogger` (CSV/JSONL to `Application.persistentDataPath`) | You play 10 min deliberately "fighting", then 10 min "fleeing east", and the profiler reports both correctly | ~1 week |
-| **3. Arena + bot personas** | `MLArena` scene (3–4 exit routes, replicated ×8); input abstraction so `PlayerController`/`WeaponManager` can be driven by a bot; persona ScriptableObjects | Each persona produces the expected profile in the profiler | ~1 week |
+| **3. Arena + bot personas** ✅ | `MLArena` scene (3–4 exit routes, replicated ×8); input abstraction so `PlayerController`/`WeaponManager` can be driven by a bot; persona ScriptableObjects | Each persona produces the expected profile in the profiler | **Done 2026-09-25**, see §10 and `reports/2026-09-25-phase3-arena-bots.md` |
 | **4. V1 training** | ML-Agents package + conda env; `RLCommander` agent; PPO config; curriculum; trained `.onnx`; inference in `MainGame` | Beats the baseline on the interception metrics vs every persona; shows the pre-positioning behavior (§4 test case) | 1–2 weeks (iterative) |
 | **5. V2** | Depends on your choice (§8) | Same interface, same metrics | TBD |
 | **6. Evaluation** | Automated eval harness (N seeded episodes × persona × commander); human playtests; analysis notebooks and plots | Report-ready comparison tables and figures | ~1 week |
@@ -208,3 +208,33 @@ Sizes are rough solo estimates and will firm up after Phase 1.
   - The thresholds (retreat ratio 0.45, 1 shot/s, windows) suit real human input.
   - The exit criterion: play about 10 min deliberately fighting, then about 10 min fleeing east, and check the overlay and `profile_final.json`.
 - **Still open:** Q3 (profile persistence across sessions). It resets every session for now.
+
+### Phase 3: done 2026-09-25 (not committed yet)
+Full write-up: `reports/2026-09-25-phase3-arena-bots.md`.
+- **Input seam.** `IPlayerInput` plus `InputOverride` on `PlayerController` and `WeaponManager` (null means keyboard, unchanged). `PlayerBot` drives the real player under the human rules: no firing while moving, the 0.42 s attack lock.
+- **Isolation for 8 arenas in one scene** (all off by default):
+  - `Enemy.AssignTargets`, and `Enemy.Start` skips the tag lookup when targets were assigned;
+  - `HordeEventSpawner.bindEnemiesToSpawner` / `mainBaseTransform` / `AbortHordeEvent()`;
+  - `PlayerBehaviourMonitor.trackSpawnerEnemiesOnly` / `mainBaseOverride` / `ResetProfile()` / `LogEvent()`.
+- **Bots.**
+  - Pure `BotBrain` + `BotPersonaSpec` → `BotParams` (re-sampled every episode) + `BotPersonaPresets`.
+  - Personas: Fighter, RunnerA, Mixed (60% flee, B > C), Adaptive (drops a route after an ambush), Kiter, Random.
+  - Ground-truth `bot_decision` events are written to telemetry.
+- **Arena.** Built by *Tools > Enemy AI > Build ML Arena*.
+  - Open field; base with MainGame's collider; refuges A = E, B = NW, C = SW at 26 units (zones E2 / NW2 / SW2 of the unchanged 17-zone map); Day 3 wave with a no-drop zombie variant.
+  - `ArenaManager` replicates it ×8, 150 units apart.
+  - Episode = 3 waves; each wave ends when cleared, after 90 s, or on player death.
+- **Verified.**
+  - Compile check: 0 errors / 7 warnings in both builds.
+  - Logic tests: all pass, including every persona in a simulated arena.
+  - Unity: 8 arenas at 8× for about 40 game-minutes each; every persona produced its expected profile signature (report §Verification).
+  - MainGame smoke test through MCP: unchanged behaviour.
+- **Changed the Phase 2 classifier (review).** `EngagementSettings.kiteGapSeconds = 1.5`: stopping to shoot within an escape counts as Kite. Otherwise kiting is invisible in this game: Kite 8% → 19%, and 0 of 3 → 11 of 14 escapes typed Kite. Set it to 0 to revert.
+- **Found (game bugs, also on `main`, not fixed).**
+  - `WeaponManager.availableWeapons` references the `Weapon.prefab` asset: the arenas shared one gun, MainGame writes to the asset, and reloads are free.
+  - The `001Z_Attack` animation events have no receiver.
+- **Carry into Phase 4.**
+  - Runner profiles are about 40% Passive, a measurement effect of spawning around the player; Flee near 60% already means "runner".
+  - Under Baseline, "ambushes" happen by chance often, so Adaptive already drifts.
+  - Keep game-seconds per frame ≤ 0.02 when raising the time scale.
+  - Consider 5 or more waves per training episode.
