@@ -1,0 +1,62 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 150a995f69bf146ad9bd03878cceacaa, type: 3}
+  m_Name: Random
+  m_EditorClassIdentifier: 
+  description: "\u968F\u673A\u578B\uFF1A\u6BCF\u56DE\u5408\u968F\u673A\u7684\u4F5C\u6218
+    / \u9003\u8DD1 / \u98CE\u7B5D\u6BD4\u4F8B\u548C\u8DEF\u7EBF\u504F\u597D\uFF0C\u53C2\u6570\u8303\u56F4\u66F4\u5BBD"
+  spec:
+    fightWeight: 1
+    fleeWeight: 1
+    kiteWeight: 1
+    routeWeights:
+    - 1
+    - 1
+    - 1
+    weightJitter: 1
+    adaptRoutes: 0
+    ambushPenalty: 0.25
+    ambushRecovery: 0.1
+    decisionDistance:
+      min: 3.5
+      max: 6
+    reactionTime:
+      min: 0.1
+      max: 0.6
+    safeDistance:
+      min: 8
+      max: 10
+    safeTime:
+      min: 1.5
+      max: 2.5
+    lingerTime:
+      min: 0.5
+      max: 6
+    fireRange:
+      min: 6
+      max: 9
+    aimError:
+      min: 1
+      max: 10
+    clickRate:
+      min: 2
+      max: 5
+    kiteNearDistance:
+      min: 3
+      max: 4.5
+    kiteMoveTime:
+      min: 0.4
+      max: 0.8
+    kiteShots:
+      min: 1.5
+      max: 3.4
+    eightWayMovement: 1
