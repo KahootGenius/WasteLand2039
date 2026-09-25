@@ -1,6 +1,6 @@
 # Plan: learning enemies, V1 (reinforcement learning)
 
-*2026-09-24. Status: **approved; Phases 0–1 done** (branch `experiment/enemy-ml`). V2 = option (a).*
+*2026-09-24. Status: **approved; Phases 0–2 done** (branch `experiment/enemy-ml`). V2 = option (a).*
 
 > **Scope note from the user:** this is **experimental, for comparative analysis only**. The user has another design of their own that they expect to perform better. Keep the ML work isolated: new files, thin hooks into existing code, and the experiment branch only. If useful later, the user's design can plug into the same `IHordeCommander` seam as another comparison arm, but only if they want that.
 
@@ -100,7 +100,7 @@ Lightweight fallback: if the Python stack fights back, the same commander can be
 |---|---|---|---|
 | **0. Groundwork** ✅ | Git init + Unity `.gitignore`; fix spawn-ring bug; gate the log spam behind a debug flag; "endless waves" test mode | Clean commit; hordes spawn in a real ring; 20× time scale runs smoothly | **Done 2026-09-24**, see §10 |
 | **1. Order API + commander seam** ✅ | `Enemy` order states (MoveTo / HoldAmbush / Chase); `Squad`; spawner accepts commander spawn requests; `IHordeCommander`; `BaselineCommander` | Game plays the same as today through the baseline commander | ~1 week |
-| **2. Zones, profiler, telemetry** | `ZoneMarker`/`ZoneMap`; `EngagementTracker` (fight/flee classifier); `PlayerProfiler`; `TelemetryLogger` (CSV/JSONL to `Application.persistentDataPath`) | You play 10 min deliberately "fighting", then 10 min "fleeing east", and the profiler reports both correctly | ~1 week |
+| **2. Zones, profiler, telemetry** ✅ | `ZoneMarker`/`ZoneMap`; `EngagementTracker` (fight/flee classifier); `PlayerProfiler`; `TelemetryLogger` (CSV/JSONL to `Application.persistentDataPath`) | You play 10 min deliberately "fighting", then 10 min "fleeing east", and the profiler reports both correctly | ~1 week |
 | **3. Arena + bot personas** | `MLArena` scene (3–4 exit routes, replicated ×8); input abstraction so `PlayerController`/`WeaponManager` can be driven by a bot; persona ScriptableObjects | Each persona produces the expected profile in the profiler | ~1 week |
 | **4. V1 training** | ML-Agents package + conda env; `RLCommander` agent; PPO config; curriculum; trained `.onnx`; inference in `MainGame` | Beats the baseline on the interception metrics vs every persona; shows the pre-positioning behavior (§4 test case) | 1–2 weeks (iterative) |
 | **5. V2** | Depends on your choice (§8) | Same interface, same metrics | TBD |
@@ -181,3 +181,30 @@ Sizes are rough solo estimates and will firm up after Phase 1.
 - **Implications for later phases:**
   - Because obstacle avoidance never takes effect, ordered squads (like all zombies today) walk straight lines and can get snagged on cars and trucks. Phase 3's arena should keep routes clear of props, or Phase 4 may need a simple waypoint path.
   - `EnemySpawner` (background spawner, off by default) bypasses the commander. Leave it disabled in experiments.
+
+### Phase 2: done 2026-09-25
+- **Pure logic** (commit 443c6c6a), unit-tested outside Unity by `.claude/tools/logic-tests.sh`:
+  - `RadialZoneMap`: 17 zones around the base, `Core` plus `E1…SE1` (6–20 units) plus `E2…SE2` (20+ units).
+  - `EngagementTracker`:
+    - An engagement starts when an enemy comes within 6 units, and ends when none has been within 9 units for 2 s.
+    - Each sample gets a label from a 0.6 s movement window (distance-weighted speed away from threats) plus a 1.5 s shot window: Fight / Flee / Kite / Passive.
+    - Escape episodes record their route, destination zone and end reason.
+  - `PlayerProfile`: decayed statistics, a feature vector of length 33 (8 + 17 + 8), and a text description.
+  - `TelemetryWriter`: writes CSV and JSON lines, always in InvariantCulture.
+- **Unity side** (commit e7d40f0f):
+  - `PlayerBehaviourMonitor`: 10 Hz FixedUpdate sampling, telemetry session files, backquote overlay, zone gizmos, and a Tools menu item.
+  - `EnemyAIBootstrap` adds the monitor automatically, so there are no scene edits.
+  - `Enemy.Registry.cs` provides the list of active enemies and an `AnyDied` event.
+  - `HordeContext` gains `Zones` / `Profile` / `Engagement`.
+- **Verified:**
+  - The compile check passes in both Editor and player versions (92 scripts, 0 errors, 7 warnings).
+  - The logic tests all pass: fighter 100% Fight; east runner 92% Flee with E1 learned at 100% consistency; kiter 79% Kite; the profile switches E→N after a change of habit; CSV and JSON stay valid under the de-DE locale.
+- **Found and fixed by the tests:**
+  1. The 2 s wait after the last enemy died was being counted as Passive, so fighters only reached 65% Fight. Behavior time now counts only while a threat is within 15 units.
+  2. A single 1.5 s window delayed flee detection by about 0.7 s, so runners showed 20% Passive. Movement and shooting now use separate windows (0.6 s / 1.5 s).
+  - About 8% Passive remains at each flee onset (roughly 0.25 s of lag). Document this as a measurement limitation in the analysis.
+- **Not yet verified (needs the Editor):**
+  - The overlay and telemetry work in real play.
+  - The thresholds (retreat ratio 0.45, 1 shot/s, windows) suit real human input.
+  - The exit criterion: play about 10 min deliberately fighting, then about 10 min fleeing east, and check the overlay and `profile_final.json`.
+- **Still open:** Q3 (profile persistence across sessions). It resets every session for now.

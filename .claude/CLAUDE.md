@@ -53,8 +53,15 @@ Real game changes (scripts, prefabs, scenes, ScriptableObjects) still go in thei
 | Intro / tutorial / dialogue | `Assets/Scripts/IntroSequence/`, `TutorialGuideManager`, `Assets/DialogueSystem.cs` | `IntroController`, `GifPlayer`, `DialogueSystem` |
 | Data assets | `Assets/Items/`, `Assets/Resources/CraftingRecipes/`, `Assets/Dialogue/`, `Assets/Day 2.asset`, `Assets/Day 3.asset` | ScriptableObject instances |
 | Enemy AI experiment *(branch `experiment/enemy-ml`)* | `Assets/Scripts/EnemyAI/Orders/`, `Assets/Scripts/EnemyAI/Commanders/` | `EnemyOrder` (MoveTo / HoldAt / Chase), `Enemy.Orders.cs` (partial `Enemy`), `Squad`, `IHordeCommander`, `HordeContext`, `BaselineCommander`, `DebugOrdersCommander` |
+| Player model + telemetry *(same branch)* | `Assets/Scripts/EnemyAI/Zones/`, `PlayerModel/`, `Telemetry/`, and `EnemyAI/*.cs` | Pure logic (unit-tested outside Unity): `RadialZoneMap`, `EngagementTracker`, `PlayerProfile`, `TelemetryWriter`. Unity side: `PlayerBehaviourMonitor`, `EnemyAIBootstrap`, `Enemy.Registry.cs` |
 
 `HordeEventSpawner` and `GameTimer` sit on the **`DayManager`** GameObject in `MainGame`. The spawner uses the commander in its Inspector field; failing that, a commander component on the same object; failing that, it adds a `BaselineCommander` at runtime.
+
+**Player model at runtime** (experiment branch):
+- `EnemyAIBootstrap` adds a `PlayerBehaviourMonitor` to every `HordeEventSpawner` on scene load, unless a monitor was placed by hand.
+- The monitor samples at 10 Hz of game time, keeps the `PlayerProfile` up to date, and exposes it to commanders through `HordeContext.Zones` / `.Profile` / `.Engagement`.
+- Telemetry is written to `~/Library/Application Support/<company>/<product>/EnemyAITelemetry/<yyyyMMdd_HHmmss>_<scene>/`. It contains `session.json`, `samples.csv`, `events.jsonl` and `profile_final.json`. Menu: *Tools > Enemy AI > Open Telemetry Folder*.
+- The in-game overlay toggles with the backquote key (`). Zones: `Core` plus `E1…SE1` (6–20 units from the base) plus `E2…SE2` (20+ units).
 
 Scenes and flow: `Assets/MainMenu.unity` → `Assets/IntroScene.unity` (used as a loading screen by `SceneController`) → `Assets/MainGame.unity`. That is exactly the Build Settings order. Scene names are loaded by string, so if you rename a scene, grep the code and the saved scene fields (`mainMenuSceneName`, `gameSceneName`, `loadingSceneName`, `SceneName`). `Assets/Scenes/SampleScene.unity` is unused and not in the build.
 
@@ -79,13 +86,16 @@ Scenes and flow: `Assets/MainMenu.unity` → `Assets/IntroScene.unity` (used as 
 - **Learning enemies, for comparative analysis only.** Branch `experiment/enemy-ml`. Plan: `workspace/plans/2026-09-24-enemy-ml-v1-rl.md`.
   - **V1** = RL commander (ML-Agents PPO).
   - **V2** = supervised escape-zone prediction plus scripted squad tactics (option a).
-  - **Status:** Phases 0 and 1 done 2026-09-24. Next is Phase 2: zones, player profiler, telemetry.
+  - **Status:** Phases 0–1 done 2026-09-24; Phase 2 done 2026-09-25. Next is Phase 3: the `MLArena` scene plus bot personas.
+  - **Open question 3** (should the player profile persist across sessions?) has no answer yet. It currently resets every session.
   - The user says this is **experimental**. They have **another design of their own that they expect to perform better**. Keep the ML work isolated (new files, thin hooks, experiment branch), and don't push it into `main` or into their design.
   - Training files will live in `MLTraining/` at the repo root, outside `Assets/`.
 
 ## Tools
 
 - `.claude/tools/compile-check.sh` compiles `Assembly-CSharp` with Unity's bundled Roslyn twice: as the Editor would and as a macOS player build would. It takes about 4 s and works whether Unity is open or closed. Run it after every C# change and report the result. Baseline on 2026-09-24: 0 errors, 7 warnings in each version. It needs Unity to have compiled the project at least once, since it reads `Library/Bee/.../Assembly-CSharp.rsp`.
+
+- `.claude/tools/logic-tests.sh` builds the pure EnemyAI logic (zones, player model, telemetry writer) together with `.claude/tools/logic-tests/LogicTests.cs`, and runs it outside Unity with Unity's .NET 6 runtime. The tests are simulated fighter, runner, kiter and adaptation players, plus a file-format check under a comma-decimal locale. It takes about 5 s. Run it after touching `EnemyAI/Zones`, `PlayerModel` or `Telemetry`, and extend it when you add logic. Only classes that don't use Unity engine internals (`Time`, `Debug`, scene objects) can be tested this way, so keep new decision logic in that style.
 
 ## Working rules for agents
 
