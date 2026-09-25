@@ -1,5 +1,5 @@
 // Behavioral tests for the pure-logic EnemyAI classes (zones, engagement tracker, player profile,
-// telemetry writer), run OUTSIDE Unity against UnityEngine.CoreModule.dll for Vector2/Mathf.
+// telemetry writer; bot personas in BotTests.cs), run OUTSIDE Unity against UnityEngine.CoreModule.dll for Vector2/Mathf.
 // Build + run: .claude/tools/logic-tests.sh
 //
 // Simulated world: 0.1 s steps, zombies walk straight at the player at 3 u/s (like the real
@@ -14,7 +14,7 @@ using System.Linq;
 using System.Text.Json;
 using UnityEngine;
 
-static class LogicTests
+static partial class LogicTests
 {
     static int failures;
 
@@ -26,6 +26,7 @@ static class LogicTests
         KiterScenario();
         AdaptationScenario();
         TelemetryFormatTest();
+        BotTests();
 
         Console.WriteLine();
         Console.WriteLine(failures == 0 ? "ALL PASSED" : $"{failures} FAILED");
