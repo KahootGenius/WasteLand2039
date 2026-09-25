@@ -29,6 +29,9 @@ public class EngagementSettings
     public float minEscapeSeconds = 1f;
     [Tooltip("撤退超过此时长强制结束一段逃跑记录")]
     public float maxEscapeSeconds = 10f;
+    [Tooltip("风筝：撤退途中停下射击不超过此时长（秒）时仍算 Kite，逃跑记录不中断。" +
+             "本游戏移动中不能开火、开火动画锁定移动约 0.42 秒，边退边打只能是\"走一段、停下射几发\"。0 = 不合并（停下射击即为 Fight）")]
+    public float kiteGapSeconds = 1.5f;
 }
 
 /// <summary>
@@ -36,7 +39,7 @@ public class EngagementSettings
 /// 每次采样调用 Step：
 /// 1. 交战：有敌人进入 engageRadius 开始；releaseRadius 内无敌人持续 releaseDelay 秒结束
 /// 2. 行为：滑动窗口内的"远离敌人速度"（对 threatRadius 内敌人按距离倒数加权）和开火频率
-///    → Fight / Flee / Kite / Passive
+///    → Fight / Flee / Kite / Passive；逃跑途中短暂停下射击（≤ kiteGapSeconds）也算 Kite
 /// 3. 逃跑：进入 Flee/Kite 开始一段 EscapeEpisode，记录经过的区域和终点区域
 /// </summary>
 public class EngagementTracker
@@ -104,6 +107,7 @@ public class EngagementTracker
     private EngagementSummary current;
     private EscapeEpisode activeEscape;
     private float lastThreatTime;
+    private float lastRetreatTime = float.NegativeInfinity;
     private Vector2 lastPosition;
 
     public EngagementTracker(IZoneMap zones, EngagementSettings settings = null)
@@ -152,6 +156,11 @@ public class EngagementTracker
         EngagementState label = retreating
             ? (shooting ? EngagementState.Kite : EngagementState.Flee)
             : (shooting ? EngagementState.Fight : EngagementState.Passive);
+        if (retreating)
+            lastRetreatTime = sample.Time;
+        else if (shooting && activeEscape != null && Settings.kiteGapSeconds > 0f &&
+                 sample.Time - lastRetreatTime <= Settings.kiteGapSeconds)
+            label = EngagementState.Kite; // 撤退途中停下射击：风筝的一部分
 
         // 3. 累计本次交战。行为时间只在有威胁时统计：
         //    敌人全部死亡 / 被甩开后、等待交战结束的那段时间不计入（否则会被误判为 Passive）
