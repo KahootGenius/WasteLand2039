@@ -53,7 +53,7 @@ Real game changes (scripts, prefabs, scenes, ScriptableObjects) still go in thei
 | Intro / tutorial / dialogue | `Assets/Scripts/IntroSequence/`, `TutorialGuideManager`, `Assets/DialogueSystem.cs` | `IntroController`, `GifPlayer`, `DialogueSystem` |
 | Data assets | `Assets/Items/`, `Assets/Resources/CraftingRecipes/`, `Assets/Dialogue/`, `Assets/Day 2.asset`, `Assets/Day 3.asset` | ScriptableObject instances |
 | Enemy AI experiment *(branch `experiment/enemy-ml`)* | `Assets/Scripts/EnemyAI/Orders/`, `Assets/Scripts/EnemyAI/Commanders/` | `EnemyOrder` (MoveTo / HoldAt / Chase), `Enemy.Orders.cs` (partial `Enemy`), `Squad`, `IHordeCommander`, `HordeContext`, `BaselineCommander`, `DebugOrdersCommander` |
-| Player model + telemetry *(same branch)* | `Assets/Scripts/EnemyAI/Zones/`, `PlayerModel/`, `Telemetry/`, and `EnemyAI/*.cs` | Pure logic (unit-tested outside Unity): `RadialZoneMap`, `EngagementTracker`, `PlayerProfile`, `TelemetryWriter`. Unity side: `PlayerBehaviourMonitor`, `EnemyAIBootstrap`, `Enemy.Registry.cs` |
+| Player model + telemetry *(same branch)* | `Assets/Scripts/EnemyAI/Zones/`, `PlayerModel/`, `Telemetry/`, and `EnemyAI/*.cs` | Pure logic (unit-tested outside Unity): `RadialZoneMap`, `EngagementTracker`, `PlayerProfile`, `TelemetryWriter`. Unity side: `PlayerBehaviourMonitor`, `PlayerProfileStore` (cross-session save), `EnemyAIBootstrap`, `Enemy.Registry.cs` |
 | RL commander *(same branch)* | `Assets/Scripts/EnemyAI/Learning/` (pure), `EnemyAI/Commanders/RLCommander.cs`, `EnemyAI/EnemyAISettings.cs`, `MLTraining/` | Pure: `CommanderActions` (3 squads × {keep, autonomous, chase, hold zone k} + reinforcement squad), `CommanderRewardTracker`. Unity: `RLCommander` (ML-Agents `Agent` + `IHordeCommander` + `IArenaEpisodeListener`; 111 observations; action schemes PerSquad [20, 20, 20, 3] every 1 s or RetaskOne [4, 19, 3] every 2 s, detected from the model; logs `commander_order` events) |
 | Bot players + ML arena *(same branch)* | `Assets/Scripts/EnemyAI/Bots/` (pure), `EnemyAI/Arena/` (Unity), `Assets/ML/` (assets), `PlayerController/IPlayerInput.cs` | Pure: `BotBrain`, `BotPersonaSpec` / `BotParams`, `BotPersonaPresets`. Unity: `PlayerBot` (drives the player through `IPlayerInput`), `BotPersona` SO, `ArenaEnvironment`, `ArenaManager`, `ArenaBase`, `ArenaRoute`, `Enemy.Targets.cs`; editor builder `Arena/Editor/ArenaAssetBuilder.cs` |
 
@@ -66,6 +66,13 @@ Real game changes (scripts, prefabs, scenes, ScriptableObjects) still go in thei
 - **Telemetry format 2** (2026-09-25):
   - `escape_end` writes the escape type as `escape_type`. Format 1 wrote a second `"type"` key, which JSON readers resolve to the escape type and so hid the event; `arena-report.py` reads both formats.
   - `escape_start` adds `enemy_zones` (for pre-positioning), and `escape_end` adds `min_enemy_distance` and `intercepted`. These metrics don't depend on the commander.
+- **The profile persists across sessions** (decided 2026-09-26; plan Q3):
+  - It's saved as JSON per scene, `~/Library/Application Support/<company>/<product>/EnemyAIProfiles/<scene>.json`, by `PlayerProfileStore`.
+  - The monitor loads it at start and saves after every wave, on pause and on exit. The file records the zone names; if the zone setup changed, the old file is ignored and overwritten.
+  - The switch is `EnemyAISettings.persistPlayerProfile` (default on; on when the asset is missing). Menus: *Tools > Enemy AI > Persist Player Profile* (toggle), *Open Saved Player Profiles Folder*, *Delete Saved Player Profiles*.
+  - Arenas never persist (`ArenaEnvironment` sets `monitor.PersistProfile = false`).
+  - The overlay and `session.json` (`profile_persistent` / `profile_session` / `profile_origin`) show whether the profile came from an earlier session.
+  - When play-testing, don't leave synthetic data in the saved file: it biases the user's next session.
 - The in-game overlay toggles with the backquote key (`). Zones: `Core` plus `E1…SE1` (6–20 units from the base) plus `E2…SE2` (20+ units).
 
 **ML arena** (experiment branch, `Assets/ML/Arena/MLArena.unity`, not in Build Settings):
@@ -113,7 +120,7 @@ Scenes and flow: `Assets/MainMenu.unity` → `Assets/IntroScene.unity` (used as 
     - interim checkpoints are in `MLTraining/results/checkpoints/` (git-ignored);
     - **decision 2026-09-26:** V1 closed as is; next is V2 (Phase 5).
   - **Pending the user's review:** the tracker's `kiteGapSeconds = 1.5` (it changes the Phase 2 Kite definition; 0 reverts it), and whether to fix the weapon-asset bug and the zombie animation events on `main`. The experiment branch silences the animation events with empty receivers (`EnemyAI/Enemy.AnimationEvents.cs`), because the error flood slowed training.
-  - **Open question 3, decided 2026-09-26:** persist the player profile across sessions, behind a switch (to be implemented).
+  - **Open question 3, decided 2026-09-26:** persist the player profile across sessions, behind a switch. Implemented and play-tested the same day (see *Player model at runtime*).
   - The user says this is **experimental**. They have **another design of their own that they expect to perform better**. Keep the ML work isolated (new files, thin hooks, experiment branch), and don't push it into `main` or into their design.
   - Training files will live in `MLTraining/` at the repo root, outside `Assets/`.
 
@@ -123,6 +130,7 @@ Scenes and flow: `Assets/MainMenu.unity` → `Assets/IntroScene.unity` (used as 
 
 - `.claude/tools/logic-tests.sh` builds the pure EnemyAI logic (zones, player model, telemetry writer, bots) together with `.claude/tools/logic-tests/*.cs`, and runs it outside Unity with Unity's .NET 6 runtime. It takes about 5 s. Run it after touching `EnemyAI/Zones`, `PlayerModel`, `Telemetry` or `Bots`, and extend it when you add logic. Only classes that don't use Unity engine internals (`Time`, `Debug`, scene objects) can be tested this way, so keep new decision logic in that style. The tests cover:
   - synthetic fighter, runner, kiter and adaptation players, plus a file-format check under a comma-decimal locale (`LogicTests.cs`);
+  - profile save / restore: a JSON round trip, continued learning after a restore, and rejection of a mismatched zone map (`ProfilePersistenceTests.cs`);
   - every bot persona driving a simulated arena through the real tracker and profile (`BotTests.cs`). It uses the same geometry and rules as `MLArena`, and prints a breakdown of tracker label by bot mode.
 
 - `.claude/tools/arena-report.py` summarizes the latest `MLArena` telemetry batch, or given session folders; add `--markdown` for tables. Per arena it reports persona, wave outcomes, bot decisions and routes (ground truth), tracker label shares, per-episode profile, and **label recall** (the share of tracker samples in the 3 s after each bot decision that carry the decided label). `--compare` adds commander metrics per persona:

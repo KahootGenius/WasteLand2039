@@ -128,7 +128,7 @@ Sizes are rough solo estimates and will firm up after Phase 1.
    - **(b) Online tabular RL:** Q-learning or a contextual bandit in C# that learns *during* play. This compares offline deep RL with online lightweight RL.
    - (c) Something you already have in mind.
 2. **Scope and rigor:** is this for a thesis or course report? That decides whether human playtests and statistical testing are required.
-3. ~~**Memory across sessions:**~~ **Decided 2026-09-26: persist, behind a switch.** The profile is saved to disk between play sessions, and a setting can turn that off (reset every session, the old behaviour). Training and eval arenas always start fresh.
+3. ~~**Memory across sessions:**~~ **Decided 2026-09-26: persist, behind a switch.** The profile is saved to disk between play sessions, and a setting can turn that off (reset every session, the old behaviour). Training and eval arenas always start fresh. **Implemented 2026-09-26:** `PlayerProfileStore` (one JSON file per scene), with the switch `EnemyAISettings.persistPlayerProfile` and menu toggles. It is unit-tested and play-tested through Unity MCP: save, load as session 2, switch off, and no persistence in arenas.
 
 ## 9. Risks
 
