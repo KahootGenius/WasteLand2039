@@ -102,7 +102,7 @@ Lightweight fallback: if the Python stack fights back, the same commander can be
 | **1. Order API + commander seam** ✅ | `Enemy` order states (MoveTo / HoldAmbush / Chase); `Squad`; spawner accepts commander spawn requests; `IHordeCommander`; `BaselineCommander` | Game plays the same as today through the baseline commander | ~1 week |
 | **2. Zones, profiler, telemetry** ✅ | `ZoneMarker`/`ZoneMap`; `EngagementTracker` (fight/flee classifier); `PlayerProfiler`; `TelemetryLogger` (CSV/JSONL to `Application.persistentDataPath`) | You play 10 min deliberately "fighting", then 10 min "fleeing east", and the profiler reports both correctly | ~1 week |
 | **3. Arena + bot personas** ✅ | `MLArena` scene (3–4 exit routes, replicated ×8); input abstraction so `PlayerController`/`WeaponManager` can be driven by a bot; persona ScriptableObjects | Each persona produces the expected profile in the profiler | **Done 2026-09-25**, see §10 and `reports/2026-09-25-phase3-arena-bots.md` |
-| **4. V1 training** | ML-Agents package + conda env; `RLCommander` agent; PPO config; curriculum; trained `.onnx`; inference in `MainGame` | Beats the baseline on the interception metrics vs every persona; shows the pre-positioning behavior (§4 test case) | 1–2 weeks (iterative) |
+| **4. V1 training** ◐ | ML-Agents package + conda env; `RLCommander` agent; PPO config; curriculum; trained `.onnx`; inference in `MainGame` | Beats the baseline on the interception metrics vs every persona; shows the pre-positioning behavior (§4 test case) | **Partly met 2026-09-25**: interception yes, pre-positioning no. See §10 and `reports/2026-09-25-phase4-rl-commander.md` |
 | **5. V2** | Depends on your choice (§8) | Same interface, same metrics | TBD |
 | **6. Evaluation** | Automated eval harness (N seeded episodes × persona × commander); human playtests; analysis notebooks and plots | Report-ready comparison tables and figures | ~1 week |
 
@@ -128,7 +128,7 @@ Sizes are rough solo estimates and will firm up after Phase 1.
    - **(b) Online tabular RL:** Q-learning or a contextual bandit in C# that learns *during* play. This compares offline deep RL with online lightweight RL.
    - (c) Something you already have in mind.
 2. **Scope and rigor:** is this for a thesis or course report? That decides whether human playtests and statistical testing are required.
-3. **Memory across sessions:** should the player profile persist between play sessions (saved to disk) or reset every session?
+3. ~~**Memory across sessions:**~~ **Decided 2026-09-26: persist, behind a switch.** The profile is saved to disk between play sessions, and a setting can turn that off (reset every session, the old behaviour). Training and eval arenas always start fresh.
 
 ## 9. Risks
 
@@ -238,3 +238,28 @@ Full write-up: `reports/2026-09-25-phase3-arena-bots.md`.
   - Under Baseline, "ambushes" happen by chance often, so Adaptive already drifts.
   - Keep game-seconds per frame ≤ 0.02 when raising the time scale.
   - Consider 5 or more waves per training episode.
+
+### Phase 4: partly met 2026-09-25 (not committed yet)
+Full write-up: `reports/2026-09-25-phase4-rl-commander.md`.
+- **Toolchain.** `com.unity.ml-agents` 3.0.0-exp.1 (Release 21) plus conda env `mlagents` (`MLTraining/setup_env.sh`, Apple Silicon pins).
+  - Headless training player: `train.sh`, time scale 20 with capture rate 1000, so 0.02 s per frame.
+  - Headless eval player: `eval.sh`, lockstep, optional `-stochastic`.
+  - `arena-report.py --compare`.
+- **Agent.** `RLCommander` (111 observations; 3 squads × {keep, autonomous, chase, hold zone k} + reinforcement squad).
+  - Two action layouts: PerSquad every 1 s, and RetaskOne every 2 s.
+  - Simple reward per §4, plus an optional head-on bonus.
+  - Curriculum on `persona_level` with routes shuffled per episode.
+  - MainGame inference hook through `EnemyAISettings` (default Baseline).
+- **Runs** (2 M decisions each):
+  - `v1_ppo_01`: PerSquad, 1.5 h.
+  - `v1_ppo_02`: RetaskOne + `head_on_bonus` 2, 2 h. Installed.
+- **Result.**
+  - Every variant (both runs, deterministic and sampled) is far more dangerous than Baseline. Bot ambushes on flee go from 10–42% to 52–95%, and damage and deaths are up for all 7 personas.
+  - **No route anticipation.** Holds are persona-independent and south-west-heavy; B is almost never held for RunnerB80. Top-1 route prediction is 19–23% against 33% chance.
+  - The §4 test is **not met**.
+- **Measurement lessons.**
+  - The escape-level "pre-positioned" metric mostly measures chasing, so it was replaced by per-flee-decision metrics.
+  - Deterministic (argmax) eval of a near-uniform policy degenerates. ML-Agents caches its inference runner per model, so the sampling flag must be set before agents initialize.
+- **Recommendation.** Close V1 here and build V2 (§8 option a), which targets route prediction directly; V1 stays as the RL arm. If RL is pushed further: a hindsight route reward, route-level actions, and longer training and episodes (report, last section).
+- **Decision 2026-09-26.** The user accepted the recommendation: V1 is closed as is, and work moves to V2. Q3 is answered: persist the profile, with a switch.
+
