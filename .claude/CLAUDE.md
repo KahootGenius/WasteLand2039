@@ -91,8 +91,8 @@ Scenes and flow: `Assets/MainMenu.unity` → `Assets/IntroScene.unity` (used as 
 - Note: a bare `using UnityEditor;` in runtime code does **not** break player builds (the player `UnityEngine.CoreModule.dll` defines that namespace). Only actual editor API calls outside `#if UNITY_EDITOR` do. Don't flag the bare `using` as a build breaker.
 - `Assets/Resources/` is 162 MB and ships in full. `ZombieWar/` (156 MB) is almost entirely unreferenced. Don't add more to Resources unless the asset is loaded by name in code.
 - `Resources.LoadAll<Item>("")` finds nothing, because `Item` assets live in `Assets/Items/`. The `GameManager` / `GameDataManager` prefabs that `SceneController` loads from Resources don't exist.
-- **Spawn bug:** `HordeEventSpawner.RandomPointOnRing` used `(cos, 0, sin)`, the X/Z plane, so enemies spawned on a horizontal line through the player. **Fixed on `experiment/enemy-ml` only** (commit "Fix horde spawn ring…"); cherry-pick it to `main` if wanted.
-- **Log spam:** fixed on `experiment/enemy-ml` via `VerboseLog`. Still present on `main`.
+- **Spawn bug:** `HordeEventSpawner.RandomPointOnRing` used `(cos, 0, sin)`, the X/Z plane, so enemies spawned on a horizontal line through the player. **Fixed on both branches** (cherry-picked to `main` on 2026-09-26).
+- **Log spam:** routine combat logs go through `VerboseLog`, compiled out unless `VERBOSE_LOGS` is defined. **On both branches** (cherry-picked to `main` on 2026-09-26).
 - **The baseline enemy AI is simpler than its code suggests.** Two features never take effect, because `Enemy` overwrites `currentTarget` every frame (`DetectMainBase` / `DetectPlayer`, now also `UpdateOrderTarget`):
   - **Swarm alerts:** `JoinSwarmChase` sets the target to the player once, and it's replaced by the base on the next frame.
   - **Stuck escape and obstacle avoidance:** the random nudge and the avoidance waypoint are overwritten the same way.
@@ -109,7 +109,8 @@ Scenes and flow: `Assets/MainMenu.unity` → `Assets/IntroScene.unity` (used as 
   - **TMP default font.** `Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF.asset` was missing (never committed), so 52 MainGame texts had no font. It's restored from TMP 3.0.7 Essential Resources with its standard GUID.
     - Lesson: **saving a scene while an asset it references is missing rewrites those references to null.** Check `git diff` after any scene save.
   - **Saving `MainGame` on the experiment branch** also writes experiment-only serialized fields (for example `HordeEventSpawner.mainBaseTransform`, `endlessWaves`, `commanderComponent`). Strip them before committing a scene change meant for `main`.
-  - Still open, for the user: `Assets/Items/Bullet.asset` has `itemName: New Item` (it shows as "New Item").
+  - The Bullet item's display name was the default "New Item"; it is now "Bullet" (both branches).
+  - **The inventory is not saved between sessions.** Only these are saved: the day (`GameDataManager`, MainMenu only), unlocked recipes (`CraftingManager`) and the starter-kit flag (`StarterItemGiver`, PlayerPrefs). So after a machine's first session, every Play starts with an empty inventory. Whether to give the kit per new game, or to save the inventory, is the user's call.
 
 ## Active work
 
