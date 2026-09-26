@@ -27,6 +27,7 @@ static partial class LogicTests
         AdaptationScenario();
         TelemetryFormatTest();
         BotTests();
+        CommanderLearningTests();
 
         Console.WriteLine();
         Console.WriteLine(failures == 0 ? "ALL PASSED" : $"{failures} FAILED");
