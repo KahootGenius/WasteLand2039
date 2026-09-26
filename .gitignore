@@ -51,3 +51,13 @@ crashlytics-build.properties
 
 # macOS
 .DS_Store
+
+# ML-Agents training output (checkpoints, TensorBoard logs); only final .onnx models go to Assets/ML/Models
+MLTraining/results/
+
+# Standalone builds of the ML arena for training
+MLTraining/builds/
+
+# ML-Agents writes timer files here when running in the Editor
+Assets/ML-Agents/
+Assets/ML-Agents.meta
