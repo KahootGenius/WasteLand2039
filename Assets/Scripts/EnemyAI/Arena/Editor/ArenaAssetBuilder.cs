@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
@@ -15,7 +16,12 @@ using Object = UnityEngine.Object;
 ///   Assets/ML/Personas/*.asset                  内置机器人性格（BotPersonaPresets）
 ///   Assets/ML/Arena/Prefabs/ArenaPlayer.prefab  复制 MainGame 的玩家：去掉拾取、弹药不走背包、加 PlayerBot
 ///   Assets/ML/Arena/Prefabs/Arena.prefab        一个训练场（基地、三条路线、玩家、生成器 + 指挥官 + 监测）
-///   Assets/ML/Arena/MLArena.unity               场景：镜头、全局光、ArenaManager（复制 8 个训练场）
+///   Assets/ML/Arena/MLArena.unity               场景：镜头、全局光、ArenaManager（复制 8 个训练场，固定性格，基准指挥官）
+///   Assets/ML/Arena/Prefabs/Arena_RL.prefab     Arena 的变体：指挥官换成 RLCommander（V1 强化学习），每回合 4 波
+///   Assets/ML/Arena/MLArena_RL.unity            训练场景：Arena_RL × 8，性格池 + 课程等级 + 打乱路线，不写遥测，
+///                                               游戏速度由 ML-Agents 训练器设置
+///   Assets/ML/Arena/MLArena_Eval_Baseline.unity 评估：8 个固定性格（含 RunnerB80），每回合 4 波，完整遥测，基准指挥官
+///   Assets/ML/Arena/MLArena_Eval_RL.unity       同上，指挥官为 RLCommander（模型见 Install Latest Commander Model）
 /// 不会修改 MainGame（只读取玩家、基地精灵和全局光），也不会改动 Build Settings。
 /// MainGame 的玩家改动后，用 Tools > Enemy AI > Rebuild Arena Player From MainGame 重新复制。
 /// </summary>
@@ -33,6 +39,18 @@ public static class ArenaAssetBuilder
     private const string PlayerPath = PrefabFolder + "/ArenaPlayer.prefab";
     private const string ArenaPath = PrefabFolder + "/Arena.prefab";
     private const string ScenePath = ArenaFolder + "/MLArena.unity";
+    private const string ArenaRLPath = PrefabFolder + "/Arena_RL.prefab";
+    private const string RLScenePath = ArenaFolder + "/MLArena_RL.unity";
+    private const int TrainingWavesPerEpisode = 4;
+    private const string EvalBaselineScenePath = ArenaFolder + "/MLArena_Eval_Baseline.unity";
+    private const string EvalRLScenePath = ArenaFolder + "/MLArena_Eval_RL.unity";
+    private const string ModelFolder = Root + "/Models";
+    private const string SettingsFolder = Root + "/Resources";
+    private const string SettingsPath = SettingsFolder + "/" + EnemyAISettings.ResourcePath + ".asset";
+    private const string ResultsFolder = "MLTraining/results";
+    private static readonly string[] EvalPersonas =
+        { "Fighter", "RunnerA", "RunnerB80", "Mixed", "Adaptive", "Kiter", "Random", "RunnerB80" };
+    private static readonly string[] EvalOnlyPersonas = { "RunnerB80" };
 
     private const string MainGamePath = "Assets/MainGame.unity";
     private const string SourceZombiePath = "Assets/Prefabs/001Z.prefab";
@@ -81,17 +99,20 @@ public static class ArenaAssetBuilder
             Sprite square = EnsureSquareSprite(log);
             GameObject zombie = EnsureZombieVariant(preview, log);
             HordeEvent wave = EnsureWave(zombie, log);
-            List<BotPersona> personas = EnsurePersonas(log);
+            // 只保存路径：新建场景会卸载未被引用的资产，之前取得的对象会失效
+            List<string> personas = EnsurePersonas(log).Select(p => AssetDatabase.GetAssetPath(p)).ToList();
 
             bool needPlayer = rebuildPlayer || !File.Exists(PlayerPath);
             bool needArena = !File.Exists(ArenaPath);
             bool needScene = !File.Exists(ScenePath);
+            bool needRLScene = !File.Exists(RLScenePath);
+            bool needEvalScenes = !File.Exists(EvalBaselineScenePath) || !File.Exists(EvalRLScenePath);
 
             // 从 MainGame 读取玩家、基地和全局光（只读；在预览场景中复制，不会弄脏 MainGame）
             GameObject sourcePlayer = null;
             GameObject sourceBase = null;
             Component sourceLight = null;
-            if (needPlayer || needArena || needScene)
+            if (needPlayer || needArena || needScene || needRLScene || needEvalScenes)
             {
                 mainGame = SceneManager.GetSceneByPath(MainGamePath);
                 if (!mainGame.isLoaded)
@@ -108,10 +129,11 @@ public static class ArenaAssetBuilder
                 BuildArenaPlayer(sourcePlayer, preview, log);
             if (needArena)
                 BuildArenaPrefab(sourceBase, square, wave, preview, log);
+            EnsureRLArenaVariant(preview, log);
 
             // 全局光先复制到预览场景：新建场景会关闭 MainGame
             Component lightTemplate = null;
-            if (needScene && sourceLight != null)
+            if ((needScene || needRLScene || needEvalScenes) && sourceLight != null)
             {
                 var holder = new GameObject("Light Template");
                 SceneManager.MoveGameObjectToScene(holder, preview);
@@ -124,12 +146,23 @@ public static class ArenaAssetBuilder
                 openedMainGame = false;
             }
 
+            if (needRLScene)
+                BuildScene(RLScenePath, ArenaRLPath, null, TrainingPool(personas), lightTemplate, log);
+            if (needEvalScenes)
+            {
+                List<string> evalPersonas = EvalPersonas.Select(n => personas.First(p => Path.GetFileNameWithoutExtension(p) == n)).ToList();
+                if (!File.Exists(EvalBaselineScenePath))
+                    BuildScene(EvalBaselineScenePath, ArenaPath, evalPersonas, null, lightTemplate, log, evaluation: true);
+                if (!File.Exists(EvalRLScenePath))
+                    BuildScene(EvalRLScenePath, ArenaRLPath, evalPersonas, null, lightTemplate, log, evaluation: true);
+            }
             if (needScene)
-                BuildScene(personas, lightTemplate, log);
+                BuildScene(ScenePath, ArenaPath, personas, null, lightTemplate, log);
             else
                 EditorSceneManager.OpenScene(ScenePath, OpenSceneMode.Single);
 
-            AssetDatabase.SaveAssets();
+            // 不调用 AssetDatabase.SaveAssets()：本工具创建的资产都已单独保存；全项目保存会把运行时被游戏弄脏的资产
+            // （MainGame 会移动 Weapon.prefab 资产的 Firepoint，见 IDEAS.md）也写入磁盘
             Debug.Log("[ArenaAssetBuilder] 完成。" + (log.Count > 0 ? "\n" + string.Join("\n", log) : "\n所有资产已存在，未作修改"));
         }
         catch (Exception exception)
@@ -444,7 +477,51 @@ public static class ArenaAssetBuilder
 
     // ---------- 场景 ----------
 
-    private static void BuildScene(List<BotPersona> personas, Component lightTemplate, List<string> log)
+    /// <summary>
+    /// 训练用性格池（课程）：0 = 只有逃跑型（路线每回合打乱）；1 = 加入混合 / 风筝 / 作战型；2 = 加入适应型和随机型
+    /// </summary>
+    private static List<(string path, int minLevel)> TrainingPool(List<string> personas)
+    {
+        var levels = new Dictionary<string, int>
+        {
+            { "RunnerA", 0 }, { "Mixed", 1 }, { "Kiter", 1 }, { "Fighter", 1 }, { "Adaptive", 2 }, { "Random", 2 }
+        };
+        var pool = new List<(string path, int minLevel)>();
+        foreach (string path in personas)
+        {
+            string name = Path.GetFileNameWithoutExtension(path);
+            if (!EvalOnlyPersonas.Contains(name))
+                pool.Add((path, levels.TryGetValue(name, out int level) ? level : 2));
+        }
+        return pool;
+    }
+
+    private static void EnsureRLArenaVariant(Scene preview, List<string> log)
+    {
+        if (File.Exists(ArenaRLPath))
+            return;
+
+        var source = AssetDatabase.LoadAssetAtPath<GameObject>(ArenaPath);
+        var instance = (GameObject)PrefabUtility.InstantiatePrefab(source, preview);
+        GameObject director = instance.GetComponentInChildren<HordeEventSpawner>(true).gameObject;
+
+        var commander = director.AddComponent<RLCommander>(); // RequireComponent 会一并添加 BehaviorParameters
+        RLCommander.ConfigureBehavior(director.GetComponent<Unity.MLAgents.Policies.BehaviorParameters>());
+        SetProperties(director.GetComponent<HordeEventSpawner>(), ("commanderComponent", commander));
+
+        var arena = new SerializedObject(instance.GetComponent<ArenaEnvironment>());
+        arena.FindProperty("wavesPerEpisode").intValue = TrainingWavesPerEpisode;
+        arena.ApplyModifiedPropertiesWithoutUndo();
+
+        instance.name = "Arena_RL";
+        PrefabUtility.SaveAsPrefabAsset(instance, ArenaRLPath);
+        Object.DestroyImmediate(instance);
+        log.Add($"创建 {ArenaRLPath}（Arena 的变体：指挥官 = RLCommander，行为名 {RLCommander.DefaultBehaviorName}，" +
+                $"观察 {RLCommander.ObservationSize}，动作 [{string.Join(", ", CommanderActions.BranchSizes(RLCommander.ExpectedZoneCount))}]，每回合 {TrainingWavesPerEpisode} 波）");
+    }
+
+    private static void BuildScene(string scenePath, string arenaPrefabPath, List<string> personas,
+        List<(string path, int minLevel)> pool, Component lightTemplate, List<string> log, bool evaluation = false)
     {
         Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
@@ -472,17 +549,178 @@ public static class ArenaAssetBuilder
         var managerObject = new GameObject("ArenaManager");
         var manager = managerObject.AddComponent<ArenaManager>();
         SetProperties(manager,
-            ("arenaPrefab", AssetDatabase.LoadAssetAtPath<ArenaEnvironment>(ArenaPath)),
+            ("arenaPrefab", AssetDatabase.LoadAssetAtPath<ArenaEnvironment>(arenaPrefabPath)),
             ("cameraController", cameraController));
         var serializedManager = new SerializedObject(manager);
-        SerializedProperty list = serializedManager.FindProperty("personas");
-        list.arraySize = personas.Count;
-        for (int i = 0; i < personas.Count; i++)
-            list.GetArrayElementAtIndex(i).objectReferenceValue = personas[i];
+        if (personas != null)
+        {
+            SerializedProperty list = serializedManager.FindProperty("personas");
+            list.arraySize = personas.Count;
+            for (int i = 0; i < personas.Count; i++)
+                list.GetArrayElementAtIndex(i).objectReferenceValue = AssetDatabase.LoadAssetAtPath<BotPersona>(personas[i]);
+        }
+        if (pool != null)
+        {
+            SerializedProperty list = serializedManager.FindProperty("personaPool");
+            list.arraySize = pool.Count;
+            for (int i = 0; i < pool.Count; i++)
+            {
+                SerializedProperty entry = list.GetArrayElementAtIndex(i);
+                entry.FindPropertyRelative("persona").objectReferenceValue = AssetDatabase.LoadAssetAtPath<BotPersona>(pool[i].path);
+                entry.FindPropertyRelative("minLevel").intValue = pool[i].minLevel;
+            }
+            // 训练：打乱路线、不写遥测（省磁盘）、游戏速度交给训练器（--time-scale）
+            serializedManager.FindProperty("shuffleRoutes").boolValue = true;
+            serializedManager.FindProperty("telemetry").enumValueIndex = (int)ArenaTelemetry.Off;
+            serializedManager.FindProperty("timeScale").floatValue = 0f;
+        }
+        if (evaluation)
+        {
+            // 评估：两种指挥官使用相同的性格、种子和回合结构（4 波），完整遥测
+            serializedManager.FindProperty("wavesPerEpisode").intValue = TrainingWavesPerEpisode;
+            serializedManager.FindProperty("timeScale").floatValue = 8f;
+            serializedManager.FindProperty("lockstepFrameTime").floatValue = 0.02f;
+            serializedManager.FindProperty("telemetry").enumValueIndex = (int)ArenaTelemetry.Full;
+        }
         serializedManager.ApplyModifiedPropertiesWithoutUndo();
 
-        EditorSceneManager.SaveScene(scene, ScenePath);
-        log.Add($"创建 {ScenePath}（ArenaManager：8 个训练场，性格 {personas.Count} 种轮流分配；未加入 Build Settings）");
+        EditorSceneManager.SaveScene(scene, scenePath);
+        log.Add(evaluation ? $"创建 {scenePath}（评估：{string.Join(", ", personas.Select(Path.GetFileNameWithoutExtension))}；每回合 {TrainingWavesPerEpisode} 波，完整遥测）" :
+            pool != null
+            ? $"创建 {scenePath}（训练：Arena_RL × 8，性格池 {pool.Count} 种按课程等级抽取，打乱路线，不写遥测；未加入 Build Settings）"
+            : $"创建 {scenePath}（ArenaManager：8 个训练场，性格 {personas.Count} 种轮流分配；未加入 Build Settings）");
+    }
+
+    // ---------- 训练好的模型 ----------
+
+    /// <summary>
+    /// 把最新一次训练（MLTraining/results/*/HordeCommander.onnx，按修改时间，忽略 smoke*）复制到
+    /// Assets/ML/Models/HordeCommander_{运行名}.onnx，并设为 Arena_RL 的模型（确定性推理）。
+    /// 没有连接训练器时 RLCommander 使用此模型；训练时忽略
+    /// </summary>
+    [MenuItem("Tools/Enemy AI/Install Latest Commander Model")]
+    public static void InstallLatestModel()
+    {
+        string latest = Directory.Exists(ResultsFolder)
+            ? Directory.GetDirectories(ResultsFolder)
+                .Where(d => !Path.GetFileName(d).StartsWith("smoke") && File.Exists(Path.Combine(d, "HordeCommander.onnx")))
+                .OrderByDescending(d => File.GetLastWriteTime(Path.Combine(d, "HordeCommander.onnx")))
+                .FirstOrDefault()
+            : null;
+        if (latest == null)
+        {
+            Debug.LogError($"[ArenaAssetBuilder] {ResultsFolder} 下没有训练结果（HordeCommander.onnx）");
+            return;
+        }
+        InstallModel(Path.Combine(latest, "HordeCommander.onnx"), Path.GetFileName(latest));
+    }
+
+    public static void InstallModel(string onnxPath, string runId)
+    {
+        EnsureFolder(Root);
+        EnsureFolder(ModelFolder);
+        string target = $"{ModelFolder}/HordeCommander_{runId}.onnx";
+        File.Copy(onnxPath, target, true);
+        AssetDatabase.ImportAsset(target, ImportAssetOptions.ForceUpdate);
+        var model = AssetDatabase.LoadAssetAtPath<Unity.Sentis.ModelAsset>(target);
+        if (model == null)
+        {
+            Debug.LogError($"[ArenaAssetBuilder] 无法导入模型 {target}");
+            return;
+        }
+
+        CommanderActions.Scheme? scheme = RLCommander.DetectScheme(model);
+        if (scheme == null)
+        {
+            Debug.LogError($"[ArenaAssetBuilder] 无法识别模型 {target} 的动作方案（action_masks 大小不符）");
+            return;
+        }
+        ConfigureRLArena(scheme.Value, model);
+
+        EnemyAISettings settings = EnsureSettings();
+        settings.rlModel = model;
+        EditorUtility.SetDirty(settings);
+        AssetDatabase.SaveAssetIfDirty(settings);
+        Debug.Log($"[ArenaAssetBuilder] 已安装模型 {target} → {ArenaRLPath}（确定性推理）和 {SettingsPath}" +
+                  $"（游戏场景当前使用：{settings.gameCommander}）");
+    }
+
+    /// <summary>
+    /// 设置 Arena_RL 的动作方案（BehaviorParameters 的动作分支 + RLCommander）和模型。
+    /// 训练新方案前也要调用（model 为 null），然后重新构建训练用的玩家程序
+    /// </summary>
+    public static void ConfigureRLArena(CommanderActions.Scheme scheme, Unity.Sentis.ModelAsset model)
+    {
+        GameObject root = PrefabUtility.LoadPrefabContents(ArenaRLPath);
+        try
+        {
+            var behavior = root.GetComponentInChildren<Unity.MLAgents.Policies.BehaviorParameters>(true);
+            RLCommander.ConfigureBehavior(behavior, scheme);
+            behavior.Model = model;
+            behavior.DeterministicInference = true;
+            var commander = root.GetComponentInChildren<RLCommander>(true);
+            commander.ActionScheme = scheme;
+            commander.DecisionInterval = RLCommander.TrainedDecisionInterval(scheme);
+            PrefabUtility.SaveAsPrefabAsset(root, ArenaRLPath);
+        }
+        finally
+        {
+            PrefabUtility.UnloadPrefabContents(root);
+        }
+        Debug.Log($"[ArenaAssetBuilder] {ArenaRLPath}：动作方案 {scheme}（决策间隔 {RLCommander.TrainedDecisionInterval(scheme)} 秒），动作分支 " +
+                  $"[{string.Join(", ", CommanderActions.BranchSizes(RLCommander.ExpectedZoneCount, scheme))}]，模型 {(model != null ? model.name : "无")}");
+    }
+
+    // ---------- 游戏场景使用的指挥官 ----------
+
+    private const string MenuBaseline = "Tools/Enemy AI/Game Commander: Baseline";
+    private const string MenuRL = "Tools/Enemy AI/Game Commander: RL";
+
+    [MenuItem(MenuBaseline, false, 100)]
+    private static void UseBaselineInGame()
+    {
+        SetGameCommander(EnemyAISettings.CommanderChoice.Baseline);
+    }
+
+    [MenuItem(MenuRL, false, 101)]
+    private static void UseRLInGame()
+    {
+        SetGameCommander(EnemyAISettings.CommanderChoice.RL);
+    }
+
+    [MenuItem(MenuBaseline, true)]
+    [MenuItem(MenuRL, true)]
+    private static bool ValidateGameCommanderMenu()
+    {
+        EnemyAISettings settings = AssetDatabase.LoadAssetAtPath<EnemyAISettings>(SettingsPath);
+        var choice = settings != null ? settings.gameCommander : EnemyAISettings.CommanderChoice.Baseline;
+        Menu.SetChecked(MenuBaseline, choice == EnemyAISettings.CommanderChoice.Baseline);
+        Menu.SetChecked(MenuRL, choice == EnemyAISettings.CommanderChoice.RL);
+        return true;
+    }
+
+    private static void SetGameCommander(EnemyAISettings.CommanderChoice choice)
+    {
+        EnemyAISettings settings = EnsureSettings();
+        settings.gameCommander = choice;
+        EditorUtility.SetDirty(settings);
+        AssetDatabase.SaveAssetIfDirty(settings);
+        if (choice == EnemyAISettings.CommanderChoice.RL && settings.rlModel == null)
+            Debug.LogWarning("[ArenaAssetBuilder] 游戏场景将使用 RL 指挥官，但还没有模型（Tools > Enemy AI > Install Latest Commander Model）；在此之前仍使用基准指挥官");
+        else
+            Debug.Log($"[ArenaAssetBuilder] 游戏场景（MainGame 等）使用的指挥官：{choice}");
+    }
+
+    private static EnemyAISettings EnsureSettings()
+    {
+        var settings = AssetDatabase.LoadAssetAtPath<EnemyAISettings>(SettingsPath);
+        if (settings != null)
+            return settings;
+        EnsureFolder(Root);
+        EnsureFolder(SettingsFolder);
+        settings = ScriptableObject.CreateInstance<EnemyAISettings>();
+        AssetDatabase.CreateAsset(settings, SettingsPath);
+        return settings;
     }
 
     // ---------- 工具 ----------
