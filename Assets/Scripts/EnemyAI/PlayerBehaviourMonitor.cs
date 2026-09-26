@@ -39,8 +39,15 @@ public class PlayerBehaviourMonitor : MonoBehaviour
     [Header("玩家画像")]
     [SerializeField] private ProfileSettings profileSettings = new ProfileSettings();
 
+    [Header("评估指标（与 CommanderRewardSettings 的默认值一致）")]
+    [Tooltip("逃跑途中（起跑 interceptGraceSeconds 秒后）有敌人进入此半径 = 被拦截")]
+    [SerializeField] private float interceptRadius = 2.5f;
+    [SerializeField] private float interceptGraceSeconds = 1f;
+
     [Header("数据记录")]
     [SerializeField] private bool writeTelemetry = true;
+    [Tooltip("写入每次采样（samples.csv）。关闭时只写事件（长时间训练时节省磁盘）")]
+    [SerializeField] private bool writeSamples = true;
     [Tooltip("采样频率（次/秒，游戏时间，不受帧率和 Time.timeScale 影响）")]
     [SerializeField] private float sampleRate = 10f;
     [Tooltip("附加在会话目录名后的标签（多个训练场同时运行时用于区分）")]
@@ -63,6 +70,20 @@ public class PlayerBehaviourMonitor : MonoBehaviour
     {
         get => sessionTag;
         set => sessionTag = value;
+    }
+
+    /// <summary>是否记录遥测；只在 Start 之前设置有效</summary>
+    public bool WriteTelemetry
+    {
+        get => writeTelemetry;
+        set => writeTelemetry = value;
+    }
+
+    /// <summary>是否写入每次采样（samples.csv）</summary>
+    public bool WriteSamples
+    {
+        get => writeSamples;
+        set => writeSamples = value;
     }
 
     public bool ShowOverlay
@@ -92,6 +113,8 @@ public class PlayerBehaviourMonitor : MonoBehaviour
     private float lastFlushRealtime;
     private PlayerSample lastSample;
     private bool closed;
+    private int trackedEscapeId = -1;
+    private float escapeMinEnemyDistance = float.PositiveInfinity;
     private GUIStyle overlayStyle;
 
     // ---------- 生命周期 ----------
@@ -266,20 +289,21 @@ public class PlayerBehaviourMonitor : MonoBehaviour
         if (!dead)
             tracker.Step(sample, enemyPositions);
         lastSample = sample;
+        TrackEscapeInterception(sample);
 
-        if (telemetry != null)
+        if (telemetry != null && writeSamples)
         {
             telemetry.WriteSample(sample.Time, waveIndex, position.x, position.y, velocity.x, velocity.y, health,
                 zoneMap.GetZoneName(tracker.CurrentZone), tracker.State.ToString(), tracker.CurrentEngagementId,
                 tracker.ActiveEscape != null ? tracker.ActiveEscape.Id : -1, tracker.EnemiesInEngageRadius,
                 tracker.NearestEnemyDistance, tracker.RetreatRatio, tracker.ShotRate,
                 sample.ShotsFired, damage, enemyPositions.Count);
+        }
 
-            if (Time.realtimeSinceStartup - lastFlushRealtime > 2f)
-            {
-                telemetry.Flush();
-                lastFlushRealtime = Time.realtimeSinceStartup;
-            }
+        if (telemetry != null && Time.realtimeSinceStartup - lastFlushRealtime > 2f)
+        {
+            telemetry.Flush();
+            lastFlushRealtime = Time.realtimeSinceStartup;
         }
     }
 
@@ -383,12 +407,33 @@ public class PlayerBehaviourMonitor : MonoBehaviour
 
     private void HandleEscapeStarted(EscapeEpisode escape)
     {
-        telemetry?.Event("escape_start", escape.StartTime)
+        trackedEscapeId = escape.Id;
+        escapeMinEnemyDistance = float.PositiveInfinity;
+        if (telemetry == null)
+            return;
+
+        // 起跑时敌人所在区域：用于评估"逃跑终点处是否已有敌人"（预判准确率，与指挥官无关）
+        var enemyZones = new List<string>(enemyPositions.Count);
+        foreach (Vector2 position in enemyPositions)
+            enemyZones.Add(zoneMap.GetZoneName(zoneMap.GetZone(position)));
+
+        telemetry.Event("escape_start", escape.StartTime)
             .Add("id", escape.Id)
             .Add("engagement", escape.EngagementId)
             .Add("zone", zoneMap.GetZoneName(escape.StartZone))
             .Add("x", escape.StartPosition.x).Add("y", escape.StartPosition.y)
+            .Add("enemy_zones", enemyZones)
             .Write();
+    }
+
+    /// <summary>逃跑途中（宽限期后）最近敌人的距离，用于判断是否被拦截</summary>
+    private void TrackEscapeInterception(PlayerSample sample)
+    {
+        EscapeEpisode escape = tracker.ActiveEscape;
+        if (escape == null || escape.Id != trackedEscapeId)
+            return;
+        if (sample.Time - escape.StartTime >= interceptGraceSeconds)
+            escapeMinEnemyDistance = Mathf.Min(escapeMinEnemyDistance, tracker.NearestEnemyDistance);
     }
 
     private void HandleEscapeEnded(EscapeEpisode escape)
@@ -405,7 +450,7 @@ public class PlayerBehaviourMonitor : MonoBehaviour
             .Add("id", escape.Id)
             .Add("engagement", escape.EngagementId)
             .Add("valid", escape.IsValid)
-            .Add("type", escape.Type.ToString())
+            .Add("escape_type", escape.Type.ToString()) // 不能叫 "type"：与事件类型重名
             .Add("reason", escape.EndReason.ToString())
             .Add("duration", escape.Duration)
             .Add("start_zone", zoneMap.GetZoneName(escape.StartZone))
@@ -415,6 +460,8 @@ public class PlayerBehaviourMonitor : MonoBehaviour
             .Add("dx", escape.Displacement.x).Add("dy", escape.Displacement.y)
             .Add("damage", escape.DamageTaken)
             .Add("base_d0", escape.StartBaseDistance).Add("base_d1", escape.EndBaseDistance)
+            .Add("min_enemy_distance", escape.Id == trackedEscapeId ? escapeMinEnemyDistance : float.PositiveInfinity)
+            .Add("intercepted", escape.Id == trackedEscapeId && escapeMinEnemyDistance <= interceptRadius)
             .Write();
 
         if (escape.IsValid)
@@ -449,7 +496,7 @@ public class PlayerBehaviourMonitor : MonoBehaviour
                 zoneNames.Add(zoneMap.GetZoneName(z));
 
             string session = JsonLine.Standalone()
-                .Add("format_version", 1)
+                .Add("format_version", 2) // 2：escape_end 的逃跑类型改名 escape_type；escape_start 加 enemy_zones；escape_end 加 intercepted
                 .Add("created", DateTime.Now.ToString("o"))
                 .Add("scene", sceneName)
                 .Add("tag", sessionTag)
