@@ -29,6 +29,15 @@ static partial class LogicTests
         restored.TryGetTopRoute(out int from2, out int to2, out float share2);
         Check(from1 == from2 && to1 == to2 && Math.Abs(share1 - share2) < 1e-6, "top route restored",
             $"= {session1.Zones.GetZoneName(from2)} → {session1.Zones.GetZoneName(to2)}");
+        var directionsBefore = new float[EscapeSectors.Count];
+        var directionsAfter = new float[EscapeSectors.Count];
+        float totalBefore = original.DirectionWeightsFrom(0, directionsBefore);
+        float totalAfter = restored.DirectionWeightsFrom(0, directionsAfter);
+        Check(totalBefore > 0f && Math.Abs(totalBefore - totalAfter) < 1e-5 && directionsBefore.SequenceEqual(directionsAfter),
+            "escape directions per start zone restored", $"(from Core: {totalAfter:F2})");
+        var legacy = original.ExportState();
+        legacy.directionFrom = null; legacy.directionBin = null; legacy.directionWeight = null;
+        Check(new PlayerProfile(original.ZoneCount).TryImportState(legacy, out _), "older save without direction counts still loads");
 
         // The next session keeps learning from where the last one stopped: same updates, same profile
         var session2 = new Sim(12);

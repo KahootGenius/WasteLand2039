@@ -32,6 +32,12 @@ public class PlayerProfileState
     public int[] routeFrom;
     public int[] routeTo;
     public float[] routeWeights;
+    /// <summary>按起点区域的逃跑方向计数（起点, 方向 0..7, 权重）；旧存档没有这些字段（视为空）</summary>
+    public int[] directionFrom;
+    public int[] directionBin;
+    public float[] directionWeight;
+    /// <summary>每次交战第一次逃跑的方向计数（8 方向）；旧存档没有（视为 0）</summary>
+    public float[] firstEscapeDirections;
     public float meanEscapeDistance;
     public float towardBaseRate;
     public float gotAwayRate;
@@ -66,6 +72,9 @@ public class PlayerProfile
     private readonly float[] destinationWeights;
     private readonly float[] directionWeights = new float[DirectionBins];
     private readonly Dictionary<long, float> routeWeights = new Dictionary<long, float>();
+    private readonly Dictionary<long, float> directionRoutes = new Dictionary<long, float>();
+    private readonly float[] firstEscapeDirections = new float[DirectionBins];
+    private int lastEscapeEngagementId = -1;
 
     public float MeanEscapeDistance { get; private set; }
     public float TowardBaseRate { get; private set; }
@@ -109,13 +118,39 @@ public class PlayerProfile
         Vector2 displacement = escape.Displacement;
         if (displacement.sqrMagnitude > 1f)
         {
+            int direction = RadialZoneMap.DirectionToSector(displacement, DirectionBins);
             Scale(directionWeights, decay);
-            directionWeights[RadialZoneMap.DirectionToSector(displacement, DirectionBins)] += 1f;
-        }
+            directionWeights[direction] += 1f;
 
+            // 按起点的方向计数，同样只衰减同一起点的（V2 预测器：从基地出发往哪个方向跑）
+            var directionKeys = new List<long>(directionRoutes.Keys);
+            foreach (long key in directionKeys)
+            {
+                if ((int)(key >> 32) == escape.StartZone)
+                    directionRoutes[key] *= decay;
+            }
+            long directionKey = RouteKey(escape.StartZone, direction);
+            directionRoutes.TryGetValue(directionKey, out float directionWeight);
+            directionRoutes[directionKey] = directionWeight + 1f;
+
+            // 每次交战的第一次逃跑 = 玩家从所在处（通常是基地）选择的路线；之后的逃跑多是在避难点被赶出来，
+            // 方向受追兵影响。V2 预测"从基地出发往哪跑"用这个分布
+            if (escape.EngagementId != lastEscapeEngagementId)
+            {
+                Scale(firstEscapeDirections, decay);
+                firstEscapeDirections[direction] += 1f;
+            }
+        }
+        lastEscapeEngagementId = escape.EngagementId;
+
+        // 路线计数只衰减同一起点的路线：P(终点 | 起点) 各自保留记忆，
+        // 不会因为玩家在别处（例如在避难点反复被赶出来）的逃跑而遗忘从基地出发的路线（V2 预测器使用）
         var keys = new List<long>(routeWeights.Keys);
         foreach (long key in keys)
-            routeWeights[key] *= decay;
+        {
+            if ((int)(key >> 32) == escape.StartZone)
+                routeWeights[key] *= decay;
+        }
         long routeKey = RouteKey(escape.StartZone, escape.EndZone);
         routeWeights.TryGetValue(routeKey, out float routeWeight);
         routeWeights[routeKey] = routeWeight + 1f;
@@ -148,6 +183,10 @@ public class PlayerProfile
             routeFrom = new int[routeWeights.Count],
             routeTo = new int[routeWeights.Count],
             routeWeights = new float[routeWeights.Count],
+            directionFrom = new int[directionRoutes.Count],
+            directionBin = new int[directionRoutes.Count],
+            directionWeight = new float[directionRoutes.Count],
+            firstEscapeDirections = (float[])firstEscapeDirections.Clone(),
             meanEscapeDistance = MeanEscapeDistance,
             towardBaseRate = TowardBaseRate,
             gotAwayRate = GotAwayRate
@@ -158,6 +197,14 @@ public class PlayerProfile
             state.routeFrom[i] = (int)(pair.Key >> 32);
             state.routeTo[i] = (int)(pair.Key & 0xffffffff);
             state.routeWeights[i] = pair.Value;
+            i++;
+        }
+        i = 0;
+        foreach (var pair in directionRoutes)
+        {
+            state.directionFrom[i] = (int)(pair.Key >> 32);
+            state.directionBin[i] = (int)(pair.Key & 0xffffffff);
+            state.directionWeight[i] = pair.Value;
             i++;
         }
         return state;
@@ -182,6 +229,12 @@ public class PlayerProfile
         else if (state.routeFrom == null || state.routeTo == null || state.routeWeights == null ||
                  state.routeFrom.Length != state.routeWeights.Length || state.routeTo.Length != state.routeWeights.Length)
             error = "路线数据不完整";
+        else if (state.directionWeight != null &&
+                 (state.directionFrom == null || state.directionBin == null ||
+                  state.directionFrom.Length != state.directionWeight.Length || state.directionBin.Length != state.directionWeight.Length))
+            error = "方向数据不完整";
+        else if (state.firstEscapeDirections != null && state.firstEscapeDirections.Length != DirectionBins)
+            error = "首次逃跑方向数据长度不符";
         if (error != null)
             return false;
 
@@ -193,6 +246,19 @@ public class PlayerProfile
         routeWeights.Clear();
         for (int i = 0; i < state.routeWeights.Length; i++)
             routeWeights[RouteKey(state.routeFrom[i], state.routeTo[i])] = state.routeWeights[i];
+        directionRoutes.Clear();
+        if (state.directionWeight != null)
+        {
+            for (int i = 0; i < state.directionWeight.Length; i++)
+            {
+                if (state.directionBin[i] >= 0 && state.directionBin[i] < DirectionBins)
+                    directionRoutes[RouteKey(state.directionFrom[i], state.directionBin[i])] = state.directionWeight[i];
+            }
+        }
+        Array.Clear(firstEscapeDirections, 0, DirectionBins);
+        if (state.firstEscapeDirections != null)
+            Array.Copy(state.firstEscapeDirections, firstEscapeDirections, DirectionBins);
+        lastEscapeEngagementId = -1;
         MeanEscapeDistance = state.meanEscapeDistance;
         TowardBaseRate = state.towardBaseRate;
         GotAwayRate = state.gotAwayRate;
@@ -241,6 +307,39 @@ public class PlayerProfile
             if (toZone < 0 || toZone >= destinationBuffer.Length)
                 continue;
             destinationBuffer[toZone] += pair.Value;
+            total += pair.Value;
+        }
+        return total;
+    }
+
+    /// <summary>每次交战第一次逃跑的方向统计的（衰减后的）总权重</summary>
+    public float FirstEscapeEvidence => Sum(firstEscapeDirections);
+
+    /// <summary>每次交战第一次逃跑的方向分布（玩家从基地出发选的路线）；无数据时为 0</summary>
+    public float FirstEscapeDirectionProbability(int direction)
+    {
+        float total = Sum(firstEscapeDirections);
+        return total > 0f ? firstEscapeDirections[direction] / total : 0f;
+    }
+
+    /// <summary>逃跑方向统计的（衰减后的）总权重</summary>
+    public float DirectionEvidence => Sum(directionWeights);
+
+    /// <summary>
+    /// 从 fromZone 出发的逃跑的方向权重（衰减后，8 方向）写入 directionBuffer，返回总权重
+    /// </summary>
+    public float DirectionWeightsFrom(int fromZone, float[] directionBuffer)
+    {
+        Array.Clear(directionBuffer, 0, directionBuffer.Length);
+        float total = 0f;
+        foreach (var pair in directionRoutes)
+        {
+            if ((int)(pair.Key >> 32) != fromZone)
+                continue;
+            int direction = (int)(pair.Key & 0xffffffff);
+            if (direction < 0 || direction >= directionBuffer.Length)
+                continue;
+            directionBuffer[direction] += pair.Value;
             total += pair.Value;
         }
         return total;
