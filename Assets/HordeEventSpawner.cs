@@ -43,6 +43,9 @@ public class HordeEventSpawner : MonoBehaviour
     private EngagementTracker engagement;
 
     public IHordeCommander Commander => commander;
+
+    /// <summary>Inspector 中是否已指定指挥官组件</summary>
+    public bool HasAssignedCommander => commanderComponent is IHordeCommander;
     public HordeContext Context => context;
 
     // 运行时状态
