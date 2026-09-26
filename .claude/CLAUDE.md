@@ -55,6 +55,7 @@ Real game changes (scripts, prefabs, scenes, ScriptableObjects) still go in thei
 | Enemy AI experiment *(branch `experiment/enemy-ml`)* | `Assets/Scripts/EnemyAI/Orders/`, `Assets/Scripts/EnemyAI/Commanders/` | `EnemyOrder` (MoveTo / HoldAt / Chase), `Enemy.Orders.cs` (partial `Enemy`), `Squad`, `IHordeCommander`, `HordeContext`, `BaselineCommander`, `DebugOrdersCommander` |
 | Player model + telemetry *(same branch)* | `Assets/Scripts/EnemyAI/Zones/`, `PlayerModel/`, `Telemetry/`, and `EnemyAI/*.cs` | Pure logic (unit-tested outside Unity): `RadialZoneMap`, `EngagementTracker`, `PlayerProfile`, `TelemetryWriter`. Unity side: `PlayerBehaviourMonitor`, `PlayerProfileStore` (cross-session save), `EnemyAIBootstrap`, `Enemy.Registry.cs` |
 | RL commander *(same branch)* | `Assets/Scripts/EnemyAI/Learning/` (pure), `EnemyAI/Commanders/RLCommander.cs`, `EnemyAI/EnemyAISettings.cs`, `MLTraining/` | Pure: `CommanderActions` (3 squads × {keep, autonomous, chase, hold zone k} + reinforcement squad), `CommanderRewardTracker`. Unity: `RLCommander` (ML-Agents `Agent` + `IHordeCommander` + `IArenaEpisodeListener`; 111 observations; action schemes PerSquad [20, 20, 20, 3] every 1 s or RetaskOne [4, 19, 3] every 2 s, detected from the model; logs `commander_order` events) |
+| V2 predictive commander *(same branch)* | `Assets/Scripts/EnemyAI/Prediction/` (pure), `EnemyAI/Commanders/PredictiveCommander.cs`, `Assets/ML/Predictors/`, `MLTraining/predictor/` | Pure: `EscapeFeatures` (66 values), `IEscapePredictor` (8 escape directions), `FrequencyPredictor`, `LearnedPredictor` (softmax regression from JSON). Unity: `PredictiveCommander` (pressure squad + ambush on the predicted direction, placed before the flee; logs `prediction` / `commander_order`) |
 | Bot players + ML arena *(same branch)* | `Assets/Scripts/EnemyAI/Bots/` (pure), `EnemyAI/Arena/` (Unity), `Assets/ML/` (assets), `PlayerController/IPlayerInput.cs` | Pure: `BotBrain`, `BotPersonaSpec` / `BotParams`, `BotPersonaPresets`. Unity: `PlayerBot` (drives the player through `IPlayerInput`), `BotPersona` SO, `ArenaEnvironment`, `ArenaManager`, `ArenaBase`, `ArenaRoute`, `Enemy.Targets.cs`; editor builder `Arena/Editor/ArenaAssetBuilder.cs` |
 
 `HordeEventSpawner` and `GameTimer` sit on the **`DayManager`** GameObject in `MainGame`. The spawner uses the commander in its Inspector field; failing that, a commander component on the same object; failing that, it adds a `BaselineCommander` at runtime.
@@ -66,6 +67,7 @@ Real game changes (scripts, prefabs, scenes, ScriptableObjects) still go in thei
 - **Telemetry format 2** (2026-09-25):
   - `escape_end` writes the escape type as `escape_type`. Format 1 wrote a second `"type"` key, which JSON readers resolve to the escape type and so hid the event; `arena-report.py` reads both formats.
   - `escape_start` adds `enemy_zones` (for pre-positioning), and `escape_end` adds `min_enemy_distance` and `intercepted`. These metrics don't depend on the commander.
+- **Telemetry format 3** (2026-09-26): `escape_start` adds `features`, the exact `EscapeFeatures` vector the V2 predictors see (58 values in the first format-3 batches, 66 since; `MLTraining/predictor` replays the last 8).
 - **The profile persists across sessions** (decided 2026-09-26; plan Q3):
   - It's saved as JSON per scene, `~/Library/Application Support/<company>/<product>/EnemyAIProfiles/<scene>.json`, by `PlayerProfileStore`.
   - The monitor loads it at start and saves after every wave, on pause and on exit. The file records the zone names; if the zone setup changed, the old file is ignored and overwritten.
@@ -112,13 +114,17 @@ Scenes and flow: `Assets/MainMenu.unity` → `Assets/IntroScene.unity` (used as 
 
 - **Learning enemies, for comparative analysis only.** Branch `experiment/enemy-ml`. Plan: `workspace/plans/2026-09-24-enemy-ml-v1-rl.md`.
   - **V1** = RL commander (ML-Agents PPO).
-  - **V2** = supervised escape-zone prediction plus scripted squad tactics (option a).
+  - **V2** = supervised escape prediction plus scripted squad tactics (option a). Plan: `workspace/plans/2026-09-26-enemy-ml-v2-predict.md`.
   - **Status:** Phases 0–1 done 2026-09-24; Phases 2–3 done 2026-09-25 (report `workspace/reports/2026-09-25-phase3-arena-bots.md`). **Phase 4 partly met** (2026-09-25; report `workspace/reports/2026-09-25-phase4-rl-commander.md`):
     - `v1_ppo_01` (PerSquad) and `v1_ppo_02` (RetaskOne + `head_on_bonus`), 2 M decisions each;
     - both are far more lethal than Baseline, but **neither anticipates routes** (§4 test not met);
     - `v1_ppo_02` is installed in `Arena_RL` and `EnemyAISettings`, and MainGame is still on Baseline;
     - interim checkpoints are in `MLTraining/results/checkpoints/` (git-ignored);
     - **decision 2026-09-26:** V1 closed as is; next is V2 (Phase 5).
+  - **Phase 5 (V2) done 2026-09-26** (report `workspace/reports/2026-09-26-phase5-v2-predictive.md`, committed locally):
+    - `PredictiveCommander` with `FrequencyPredictor` passes the §4 test. The ambush is on the bot's route at 83% of RunnerA / 48% of RunnerB80 flee decisions (chance 33%), and RunnerB80's ambush rate rises from wave 1 to 4. It stays near Baseline lethality for non-runners.
+    - The learned predictor is more accurate at flee onset (it uses the live threat), but not for an ambush placed in advance; it ships as an option.
+    - MainGame is still on Baseline (menu *Game Commander: V2 (Predictive)*). Next: plan Phase 6 (evaluation, human playtests), the user's call.
   - **Pending the user's review:** the tracker's `kiteGapSeconds = 1.5` (it changes the Phase 2 Kite definition; 0 reverts it), and whether to fix the weapon-asset bug and the zombie animation events on `main`. The experiment branch silences the animation events with empty receivers (`EnemyAI/Enemy.AnimationEvents.cs`), because the error flood slowed training.
   - **Open question 3, decided 2026-09-26:** persist the player profile across sessions, behind a switch. Implemented and play-tested the same day (see *Player model at runtime*).
   - The user says this is **experimental**. They have **another design of their own that they expect to perform better**. Keep the ML work isolated (new files, thin hooks, experiment branch), and don't push it into `main` or into their design.
@@ -131,12 +137,14 @@ Scenes and flow: `Assets/MainMenu.unity` → `Assets/IntroScene.unity` (used as 
 - `.claude/tools/logic-tests.sh` builds the pure EnemyAI logic (zones, player model, telemetry writer, bots) together with `.claude/tools/logic-tests/*.cs`, and runs it outside Unity with Unity's .NET 6 runtime. It takes about 5 s. Run it after touching `EnemyAI/Zones`, `PlayerModel`, `Telemetry` or `Bots`, and extend it when you add logic. Only classes that don't use Unity engine internals (`Time`, `Debug`, scene objects) can be tested this way, so keep new decision logic in that style. The tests cover:
   - synthetic fighter, runner, kiter and adaptation players, plus a file-format check under a comma-decimal locale (`LogicTests.cs`);
   - profile save / restore: a JSON round trip, continued learning after a restore, and rejection of a mismatched zone map (`ProfilePersistenceTests.cs`);
+  - V2 predictors: feature layout, direction prediction, start-zone memory, first escape per engagement, and the learned model's maths (`PredictionTests.cs`);
   - every bot persona driving a simulated arena through the real tracker and profile (`BotTests.cs`). It uses the same geometry and rules as `MLArena`, and prints a breakdown of tracker label by bot mode.
 
 - `.claude/tools/arena-report.py` summarizes the latest `MLArena` telemetry batch, or given session folders; add `--markdown` for tables. Per arena it reports persona, wave outcomes, bot decisions and routes (ground truth), tracker label shares, per-episode profile, and **label recall** (the share of tracker samples in the 3 s after each bot decision that carry the decided label). `--compare` adds commander metrics per persona:
   - escape interception;
   - per-flee-decision metrics (zombie on the chosen route, bot ambushed, ambush by wave in the episode, top-1 route prediction against 1/3 chance);
-  - hold orders by route sector.
+  - hold orders by route sector;
+  - for V2, "ambush on route" (from `prediction` events).
 
   **The escape-level "pre-positioned" metric mostly measures chasing** (most escapes start at a refuge with chasers around). Use the per-decision metrics for the plan's §4 test.
 
@@ -160,13 +168,18 @@ Scenes and flow: `Assets/MainMenu.unity` → `Assets/IntroScene.unity` (used as 
   - **Training:** `MLTraining/train.sh RUN_ID [NUM_ENVS]` runs the headless `MLTraining/builds/MLArena_RL.app` (build only the `MLArena_RL` scene; the MCP `manage_build` action with `scenes` leaves Build Settings alone). Config: `MLTraining/config/commander_ppo.yaml`, or `CONFIG=...` (for example `commander_ppo_headon.yaml`, which sets the `head_on_bonus` environment parameter that `RLCommander` reads each episode). Use `ARENA_BUILD=...` for another player (for example `builds/retask/MLArena_RL` for RetaskOne). The action scheme is baked into the build: `ArenaAssetBuilder.ConfigureRLArena(scheme, null)`, then build. Output goes to `MLTraining/results/RUN_ID/` (git-ignored, like `builds/`). Don't rebuild the player while a run is using it.
   - **Timing:** ML-Agents fixes the capture frame rate, so game time per frame = time scale / capture rate. Bots, zombie targeting and firing run in `Update`, so `train.sh` uses time scale 20 with capture rate 1000, giving 0.02 s per frame. The default 60 would give 0.33 s per frame. Check the `[ArenaManager] ... fps, game time per frame` lines in `results/RUN_ID/run_logs/Player-*.log`.
   - **Player builds have side effects.** The MCP `manage_build` tool saves all dirty assets first. URP re-serializes `Assets/Settings/UniversalRP.asset` (adds default fields), and TMP clears the glyph table of `Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF - Fallback.asset`. After building, check `git status` and `git checkout --` those two files (they are not our changes). Editor-mode ML-Agents runs write `Assets/ML-Agents/Timers/*.json` (git-ignored).
-  - **Evaluation:** `MLTraining/eval.sh MLArena_Eval_Baseline|MLArena_Eval_RL [GAME_MINUTES]` runs the headless eval player (`MLTraining/builds/eval/`; rebuild it after installing a model). It uses lockstep 0.02 s per frame, about 25–37× real time, and quits after N game-minutes. Compare with `python3 .claude/tools/arena-report.py --compare <baseline batch> <RL batch>`.
+  - **Evaluation:** `MLTraining/eval.sh MLArena_Eval_Baseline|MLArena_Eval_RL|MLArena_Eval_V2|MLArena_Data [GAME_MINUTES] [args]` runs the headless eval player (build all four scenes into it; V2 options `-v2Predictor Frequency|Learned`, `-v2From Base|PlayerZone`, `-v2React`) (`MLTraining/builds/eval/`; rebuild it after installing a model). It uses lockstep 0.02 s per frame, about 25–37× real time, and quits after N game-minutes. Compare with `python3 .claude/tools/arena-report.py --compare <baseline batch> <RL batch>`.
     - Add `-stochastic` after the minutes to **sample** actions instead of taking the most likely one. Use it for policies that are still far from deterministic, where argmax degenerates: the `v1_ppo_02` 400k checkpoint re-tasked only squad 2, between two zones.
     - ML-Agents caches one inference runner per model (`Academy.GetOrCreateModelRunner` ignores the deterministic flag). So the flag must be set before the first agent with that model initializes; changing `BehaviorParameters.DeterministicInference` later has no effect. `ArenaManager` sets it on the prefab before instantiating.
   - **Throughput:** 3 envs give about 400 decisions/s (Editor: about 110 at a 60 fps cap). The machine runs near its 8 GB RAM limit with the Editor open.
   - **Models:** *Tools > Enemy AI > Install Latest Commander Model* copies the newest `results/*/HordeCommander.onnx` to `Assets/ML/Models/` and assigns it to `Arena_RL` (deterministic inference) and to `Assets/ML/Resources/EnemyAISettings.asset`.
   - **Using RL in MainGame:** *Tools > Enemy AI > Game Commander: Baseline / RL* switches which commander normal scenes use. `EnemyAIBootstrap` adds an inference-only `RLCommander` next to spawners without a commander; there are no scene edits and the default is Baseline.
 
+- **V2 predictor** (`MLTraining/predictor/`, conda env `mlagents` or any NumPy):
+  - Data comes from `eval.sh MLArena_Data 240` (Baseline, shuffled routes, events only).
+  - Train: `train_predictor.py --data <batch> [--no-threat] --out Assets/ML/Predictors/X.json`. The shipped `EscapePredictor_v1.json` is history-only (`--no-threat`).
+  - Evaluate: `evaluate_predictors.py --batch <batch> [--weights X.json] [--decisions]`. `--decisions` measures route prediction from the base at bot flee decisions, which is what the ambush needs.
+  - The Python replay of the frequency predictor mirrors `PlayerProfile` / `FrequencyPredictor`; change both together.
 - `.claude/tools/unity-mcp-call.py` is a minimal stdio MCP client. It launches the UnityMCP server exactly as Claude Code does (telemetry off) and lists or calls tools, for example `python3 .claude/tools/unity-mcp-call.py call read_console '{"action":"get","types":["error"]}'`. Use it when the `mcp__UnityMCP__*` tools aren't loaded in the current session. Unity must be open with an active stdio session.
 
 ## Working rules for agents

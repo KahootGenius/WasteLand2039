@@ -103,7 +103,7 @@ Lightweight fallback: if the Python stack fights back, the same commander can be
 | **2. Zones, profiler, telemetry** ✅ | `ZoneMarker`/`ZoneMap`; `EngagementTracker` (fight/flee classifier); `PlayerProfiler`; `TelemetryLogger` (CSV/JSONL to `Application.persistentDataPath`) | You play 10 min deliberately "fighting", then 10 min "fleeing east", and the profiler reports both correctly | ~1 week |
 | **3. Arena + bot personas** ✅ | `MLArena` scene (3–4 exit routes, replicated ×8); input abstraction so `PlayerController`/`WeaponManager` can be driven by a bot; persona ScriptableObjects | Each persona produces the expected profile in the profiler | **Done 2026-09-25**, see §10 and `reports/2026-09-25-phase3-arena-bots.md` |
 | **4. V1 training** ◐ | ML-Agents package + conda env; `RLCommander` agent; PPO config; curriculum; trained `.onnx`; inference in `MainGame` | Beats the baseline on the interception metrics vs every persona; shows the pre-positioning behavior (§4 test case) | **Partly met 2026-09-25**: interception yes, pre-positioning no. See §10 and `reports/2026-09-25-phase4-rl-commander.md` |
-| **5. V2** | Depends on your choice (§8) | Same interface, same metrics | TBD |
+| **5. V2** ✅ | Option (a): escape prediction + scripted ambush (`plans/2026-09-26-enemy-ml-v2-predict.md`) | Same interface, same metrics | **Done 2026-09-26**: §4 test met. See `reports/2026-09-26-phase5-v2-predictive.md` |
 | **6. Evaluation** | Automated eval harness (N seeded episodes × persona × commander); human playtests; analysis notebooks and plots | Report-ready comparison tables and figures | ~1 week |
 
 Sizes are rough solo estimates and will firm up after Phase 1.
@@ -262,4 +262,17 @@ Full write-up: `reports/2026-09-25-phase4-rl-commander.md`.
   - Deterministic (argmax) eval of a near-uniform policy degenerates. ML-Agents caches its inference runner per model, so the sampling flag must be set before agents initialize.
 - **Recommendation.** Close V1 here and build V2 (§8 option a), which targets route prediction directly; V1 stays as the RL arm. If RL is pushed further: a hindsight route reward, route-level actions, and longer training and episodes (report, last section).
 - **Decision 2026-09-26.** The user accepted the recommendation: V1 is closed as is, and work moves to V2. Q3 is answered: persist the profile, with a switch.
+
+### Phase 5 (V2): done 2026-09-26 (committed locally)
+Full write-up: `reports/2026-09-26-phase5-v2-predictive.md`; plan `plans/2026-09-26-enemy-ml-v2-predict.md`.
+- **What it is.** `PredictiveCommander`:
+  - it predicts the player's escape *direction* from the base (the frequency predictor over the first escape of each engagement);
+  - it holds 2 of the 5 active zombies at the outer zone in that direction before the flee; the rest behave like Baseline.
+- **Result.**
+  - The §4 test is met. For RunnerA, the ambush is on the route at 83% of flee decisions; for RunnerB80, 48% overall and about 65% once the profile has evidence (chance 33%).
+  - A zombie is physically on route B at 33% of decisions, against 3% under Baseline and 7–8% under V1.
+  - RunnerB80's ambush rate rises from 49% in wave 1 to about 70% in waves 2–4.
+  - Lethality stays near Baseline for non-runners; V1 was far more lethal but never anticipated a route.
+- **The learned predictor** (softmax regression on 8,652 logged escapes) is more accurate at flee onset (67% vs 45% held out). That comes from the live threat, which an ambush placed in advance can't use, and the history-only version doesn't beat counting. It ships as an option.
+- **Also done:** profile persistence across sessions (Q3), telemetry format 3, and the MainGame hook (default Baseline).
 

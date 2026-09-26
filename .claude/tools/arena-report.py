@@ -30,7 +30,10 @@ Per bot flee decision (ground truth route; the escape_start within 2 s supplies 
   route predicted  plan §4 test: the route sector holding the most zombies (unique max) is the route
                    the bot takes; only decisions made outside all route sectors with some route
                    occupied count; chance = 1/3
-Hold orders (RL, `commander_order` events): share of hold-zone orders per route sector.
+  ambush on route  (V2 only, `prediction` events at flee onset) the commander had an ambush site with at
+                   least one member in the chosen route's sector: the plan §4 wording ("has a squad at B
+                   before flee onset"), whether or not the squad is standing there at that moment
+Hold orders (RL / V2, `commander_order` events): share of hold-zone orders per route sector.
 Per wave: player damage (100 - HP at the end, 100 if the player died) and deaths.
 Intervals are 95% Wilson score intervals.
 """
@@ -179,13 +182,15 @@ def summarize(path):
             wave_in_episode += 1
         if d["type"] != "bot_decision" or d.get("mode") != "Flee" or d.get("route") not in ROUTE_SECTOR:
             continue
-        onset, ambushed = None, False
+        onset, ambushed, prediction = None, False, None
         for g in events[i + 1:]:
             if g["type"] in ("bot_decision", "episode_start"):
                 break
             if onset is None and g["type"] == "escape_start" and "enemy_zones" in g \
                     and g["t"] - d["t"] <= FLEE_ONSET_WINDOW:
                 onset = g
+            if prediction is None and g["type"] == "prediction" and g["t"] - d["t"] <= FLEE_ONSET_WINDOW:
+                prediction = g
             if g["type"] == "bot_ambushed" and g.get("route") == d["route"]:
                 ambushed = True
         if onset is None:
@@ -203,6 +208,9 @@ def summarize(path):
             # (only when the bot is outside all route sectors and some route has zombies; chance 1/3)
             "predicted": (counts[d["route"]] == best and list(counts.values()).count(best) == 1)
                          if bot_sector not in SECTOR_ROUTE and best > 0 else None,
+            "ambush_on_route": (any(sector(a.split(":")[0]) == route_sector and int(a.split(":")[1]) > 0
+                                    for a in prediction.get("ambush", []))
+                                if prediction is not None and bot_sector != route_sector else None),
         })
     holds = Counter(SECTOR_ROUTE.get(sector(e.get("zone", "")), "other") for e in events
                     if e["type"] == "commander_order" and e.get("order") == "HoldAt")
@@ -261,7 +269,10 @@ def fmt_counter(c, keys=None):
 def flee_stats(flees):
     known = [f for f in flees if f["on_route"] is not None]
     guessed = [f for f in flees if f["predicted"] is not None]
+    planned = [f for f in flees if f.get("ambush_on_route") is not None]
     return {
+        "ambush_n": len(planned),
+        "ambush_on_route": sum(f["ambush_on_route"] for f in planned),
         "n": len(flees),
         "ambushed": sum(f["ambushed"] for f in flees),
         "on_route_n": len(known),
@@ -383,6 +394,9 @@ def compare(a, b, markdown):
                 [persona, "flee: route predicted (top-1, chance 33%)", fmt_prop(fa["predicted"], fa["predicted_n"]),
                  fmt_prop(fb["predicted"], fb["predicted_n"])],
             ]
+            if fa["ambush_n"] or fb["ambush_n"]:
+                lines.append([persona, "flee: ambush on route (V2)", fmt_prop(fa["ambush_on_route"], fa["ambush_n"]),
+                              fmt_prop(fb["ambush_on_route"], fb["ambush_n"])])
         holds_a = sum((r["holds"] for r in ra), Counter())
         holds_b = sum((r["holds"] for r in rb), Counter())
         if holds_a or holds_b:
