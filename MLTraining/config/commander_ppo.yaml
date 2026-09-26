@@ -1,0 +1,55 @@
+# PPO config for the V1 RL horde commander (behavior "HordeCommander", RLCommander.cs).
+# 8 agents (one per arena) share one policy. A decision = one step: every 1 s of game time, plus
+# at wave start and at every flee onset. Episode = 4 waves (ArenaEnvironment, Arena_RL.prefab).
+#
+# Curriculum (environment parameter persona_level, read by RLCommander at each episode start and
+# used by ArenaEnvironment to filter the persona pool; routes are shuffled every episode):
+#   0 = runners only (one route per episode, random which)
+#   1 = + Mixed, Kiter, Fighter
+#   2 = + Adaptive, Random
+# Lessons advance on training progress (fraction of max_steps), not on reward, because the reward
+# scale depends on the persona mix.
+behaviors:
+  HordeCommander:
+    trainer_type: ppo
+    hyperparameters:
+      batch_size: 256
+      buffer_size: 4096
+      learning_rate: 3.0e-4
+      learning_rate_schedule: linear
+      beta: 5.0e-3
+      epsilon: 0.2
+      lambd: 0.95
+      num_epoch: 3
+    network_settings:
+      normalize: false
+      hidden_units: 128
+      num_layers: 2
+    reward_signals:
+      extrinsic:
+        gamma: 0.99
+        strength: 1.0
+    time_horizon: 128
+    max_steps: 2000000
+    summary_freq: 5000
+    checkpoint_interval: 100000
+    keep_checkpoints: 3
+    threaded: false
+
+environment_parameters:
+  persona_level:
+    curriculum:
+      - name: Runners
+        completion_criteria:
+          measure: progress
+          behavior: HordeCommander
+          threshold: 0.2
+        value: 0
+      - name: Mixed
+        completion_criteria:
+          measure: progress
+          behavior: HordeCommander
+          threshold: 0.5
+        value: 1
+      - name: All
+        value: 2
