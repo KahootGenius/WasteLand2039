@@ -223,6 +223,29 @@ public class PlayerProfile
         return total > 0f && zone >= 0 && zone < ZoneCount ? destinationWeights[zone] / total : 0f;
     }
 
+    /// <summary>逃跑终点统计的（衰减后的）总权重：约等于"最近的有效逃跑次数"，用于预测器的平滑</summary>
+    public float EscapeEvidence => Sum(destinationWeights);
+
+    /// <summary>
+    /// 从 fromZone 出发的逃跑的终点权重（衰减后）写入 destinationBuffer（长度 ZoneCount），返回总权重
+    /// </summary>
+    public float RouteWeightsFrom(int fromZone, float[] destinationBuffer)
+    {
+        Array.Clear(destinationBuffer, 0, destinationBuffer.Length);
+        float total = 0f;
+        foreach (var pair in routeWeights)
+        {
+            if ((int)(pair.Key >> 32) != fromZone)
+                continue;
+            int toZone = (int)(pair.Key & 0xffffffff);
+            if (toZone < 0 || toZone >= destinationBuffer.Length)
+                continue;
+            destinationBuffer[toZone] += pair.Value;
+            total += pair.Value;
+        }
+        return total;
+    }
+
     public float EscapeDirectionProbability(int direction)
     {
         float total = Sum(directionWeights);

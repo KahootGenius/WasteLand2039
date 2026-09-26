@@ -1,7 +1,7 @@
 #!/bin/zsh
 # Build and run the EnemyAI pure-logic tests OUTSIDE Unity, using Unity's bundled Roslyn and
 # .NET 6 runtime. Compiles the game's logic sources (zones, player model, telemetry writer, bots,
-# commander actions / rewards)
+# commander actions / rewards, escape predictors)
 # together with .claude/tools/logic-tests/*.cs against UnityEngine.CoreModule.dll.
 # Only classes that don't touch Unity engine internals (Time, Debug, scene) can be tested here.
 #
@@ -22,6 +22,7 @@ SOURCES=(
   Assets/Scripts/EnemyAI/Telemetry/*.cs(N)
   Assets/Scripts/EnemyAI/Bots/*.cs(N)
   Assets/Scripts/EnemyAI/Learning/*.cs(N)
+  Assets/Scripts/EnemyAI/Prediction/*.cs(N)
   .claude/tools/logic-tests/*.cs(N)
 )
 
