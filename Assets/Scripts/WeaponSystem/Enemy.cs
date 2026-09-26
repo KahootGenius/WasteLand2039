@@ -1217,6 +1217,20 @@ public partial class Enemy : MonoBehaviour, IDamageable // 命令扩展见 Enemy
     {
         Destroy(gameObject);
     }
+
+    // ========== 动画事件 ==========
+    // 001Z 的动画片段带有下面三个事件，没有接收方法时每次攻击 / 死亡都会在控制台报 "has no receiver"。
+    // 命中和攻击结束由 PerformAttack 协程处理，销毁由 Die 按死亡动画时长安排（CalculateDestroyDelay），
+    // 所以这些方法不做任何事，行为不变。
+
+    /// <summary>动画事件（001Z_Attack）：攻击命中帧。伤害由 PerformAttack 协程结算</summary>
+    private void OnAttackHit() { }
+
+    /// <summary>动画事件（001Z_Attack）：攻击动画结束。攻击状态由 PerformAttack 协程管理</summary>
+    private void OnAttackComplete() { }
+
+    /// <summary>动画事件（001Z_Death）：死亡动画结束。销毁已由 Die 按死亡动画时长安排</summary>
+    private void OnDeathComplete() { }
     
     /// <summary>
     /// 播放音效
