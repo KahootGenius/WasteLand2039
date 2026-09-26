@@ -29,6 +29,8 @@ public static class BotPersonaPresets
             Description = "风筝型：沿路线边退边打（走一段、停下射击、再走），偏好路线 C" },
         new Preset { Name = "Random", Spec = RandomPlayer(),
             Description = "随机型：每回合随机的作战 / 逃跑 / 风筝比例和路线偏好，参数范围更宽" },
+        new Preset { Name = "RunnerB80", Spec = RunnerB80(),
+            Description = "仅用于评估（计划 §4 的测试用例）：总是逃跑，80% 走路线 B（西北），A / C 各 10%。不在训练性格池中" },
     };
 
     public static BotPersonaSpec Fighter()
@@ -39,6 +41,11 @@ public static class BotPersonaPresets
     public static BotPersonaSpec RunnerA()
     {
         return new BotPersonaSpec { fightWeight = 0f, fleeWeight = 1f, kiteWeight = 0f, routeWeights = new[] { 1f, 0f, 0f } };
+    }
+
+    public static BotPersonaSpec RunnerB80()
+    {
+        return new BotPersonaSpec { fightWeight = 0f, fleeWeight = 1f, kiteWeight = 0f, routeWeights = new[] { 0.1f, 0.8f, 0.1f }, weightJitter = 0f };
     }
 
     public static BotPersonaSpec Mixed()

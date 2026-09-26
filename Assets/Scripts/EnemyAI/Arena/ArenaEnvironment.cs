@@ -12,6 +12,9 @@ using UnityEngine;
 /// 机器人的每次决定写入遥测（bot_decision），作为评估玩家画像的真实标签。
 ///
 /// 由 ArenaManager 复制多份（相距足够远，互不干扰）；也可以单独放进场景使用。
+/// 训练时 ArenaManager 可指定性格池：每回合从池中（按课程等级 ArenaCurriculum.Level）随机抽一个性格，
+/// 并可打乱路线偏好的顺序（例如 RunnerA 变成随机的 Runner-A/B/C），迫使指挥官读取玩家画像而不是记住路线。
+/// 指挥官实现 IArenaEpisodeListener 时，每回合开始前 / 结束后会收到通知。
 /// </summary>
 public class ArenaEnvironment : MonoBehaviour
 {
@@ -47,6 +50,9 @@ public class ArenaEnvironment : MonoBehaviour
     private bool humanControl;
     private BotParams currentParams;
     private int decisionsThisWave;
+    private IReadOnlyList<PersonaPoolEntry> personaPool;
+    private bool shuffleRoutes;
+    private readonly List<BotPersona> eligible = new List<BotPersona>();
 
     public int ArenaIndex { get; private set; }
     public int Episode { get; private set; }
@@ -62,7 +68,7 @@ public class ArenaEnvironment : MonoBehaviour
     /// <summary>true = 机器人停用，由键盘鼠标操作（本回合剩余时间的数据标记为 human）</summary>
     public bool HumanControl
     {
-        get => humanControl || persona == null || bot == null;
+        get => humanControl || (persona == null && personaPool == null) || bot == null;
         set
         {
             humanControl = value;
@@ -72,7 +78,7 @@ public class ArenaEnvironment : MonoBehaviour
         }
     }
 
-    public string ControllerName => HumanControl ? "human" : "bot:" + persona.name;
+    public string ControllerName => HumanControl ? "human" : "bot:" + (persona != null ? persona.name : "?");
 
     /// <summary>
     /// 由 ArenaManager 在实例化后立即（Start 之前）调用：指定序号、性格和随机种子
@@ -85,6 +91,37 @@ public class ArenaEnvironment : MonoBehaviour
         name = $"Arena {index} ({(persona != null ? persona.name : "human")})";
         if (monitor != null)
             monitor.SessionTag = $"arena{index}_{(persona != null ? persona.name : "human")}";
+    }
+
+    /// <summary>
+    /// 训练用：每回合从性格池中随机抽取性格（替代固定性格）。须在 Start 之前调用
+    /// </summary>
+    public void SetPersonaPool(IReadOnlyList<PersonaPoolEntry> pool, bool shuffleRouteOrder)
+    {
+        personaPool = pool != null && pool.Count > 0 ? pool : null;
+        shuffleRoutes = shuffleRouteOrder;
+        if (personaPool != null)
+        {
+            name = $"Arena {ArenaIndex} (pool)";
+            if (monitor != null)
+                monitor.SessionTag = $"arena{ArenaIndex}_pool";
+        }
+    }
+
+    /// <summary>每回合的波数（评估时让基准和学习型指挥官的回合结构一致）。须在 Start 之前调用</summary>
+    public void SetWavesPerEpisode(int waves)
+    {
+        if (waves > 0)
+            wavesPerEpisode = waves;
+    }
+
+    /// <summary>设置遥测记录量。须在 Start 之前调用</summary>
+    public void SetTelemetry(ArenaTelemetry mode)
+    {
+        if (monitor == null)
+            return;
+        monitor.WriteTelemetry = mode != ArenaTelemetry.Off;
+        monitor.WriteSamples = mode == ArenaTelemetry.Full;
     }
 
     private void Awake()
@@ -145,7 +182,13 @@ public class ArenaEnvironment : MonoBehaviour
         if (resetProfileEachEpisode && Episode > 1)
             monitor?.ResetProfile("episode");
 
+        (spawner.Commander as IArenaEpisodeListener)?.OnArenaEpisodeStarting(this);
+        if (personaPool != null)
+            persona = PickFromPool();
+
         currentParams = persona != null ? persona.Sample(rng) : null;
+        if (currentParams != null && shuffleRoutes)
+            Shuffle(currentParams.RouteWeights);
         if (bot != null && currentParams != null)
             bot.Begin(currentParams, BuildLayout(), rng.Next());
 
@@ -154,7 +197,10 @@ public class ArenaEnvironment : MonoBehaviour
             JsonLine line = monitor.LogEvent("episode_start")
                 .Add("episode", Episode)
                 .Add("arena", ArenaIndex)
-                .Add("control", HumanControl ? "human" : "bot");
+                .Add("control", HumanControl ? "human" : "bot")
+                .Add("commander", spawner.Commander != null ? spawner.Commander.DisplayName : "")
+                .Add("curriculum_level", ArenaCurriculum.Level)
+                .Add("routes_shuffled", shuffleRoutes);
             if (currentParams != null)
                 currentParams.AddTo(line);
             line.Write();
@@ -163,10 +209,40 @@ public class ArenaEnvironment : MonoBehaviour
 
     private void EndEpisode()
     {
-        if (monitor == null)
-            return;
-        monitor.LogEvent("episode_end").Add("episode", Episode).Add("arena", ArenaIndex).Write();
-        monitor.LogProfileSnapshot("episode_end");
+        if (monitor != null)
+        {
+            monitor.LogEvent("episode_end").Add("episode", Episode).Add("arena", ArenaIndex).Write();
+            monitor.LogProfileSnapshot("episode_end");
+        }
+        (spawner.Commander as IArenaEpisodeListener)?.OnArenaEpisodeEnded(this);
+    }
+
+    private BotPersona PickFromPool()
+    {
+        eligible.Clear();
+        foreach (PersonaPoolEntry entry in personaPool)
+        {
+            if (entry != null && entry.persona != null && entry.minLevel <= ArenaCurriculum.Level)
+                eligible.Add(entry.persona);
+        }
+        if (eligible.Count == 0)
+        {
+            foreach (PersonaPoolEntry entry in personaPool)
+            {
+                if (entry != null && entry.persona != null)
+                    eligible.Add(entry.persona);
+            }
+        }
+        return eligible.Count > 0 ? eligible[rng.Next(eligible.Count)] : persona;
+    }
+
+    private void Shuffle(float[] values)
+    {
+        for (int i = values.Length - 1; i > 0; i--)
+        {
+            int j = rng.Next(i + 1);
+            (values[i], values[j]) = (values[j], values[i]);
+        }
     }
 
     private IEnumerator RunWave()
@@ -224,9 +300,11 @@ public class ArenaEnvironment : MonoBehaviour
         if (body != null)
             body.velocity = Vector2.zero;
 
+        // 满弹匣（正在换弹时让它换完，SetWeaponStats 会为取消换弹打警告）
         WeaponManager weapons = player.GetComponentInChildren<WeaponManager>();
-        if (weapons != null && weapons.CurrentWeapon != null)
-            weapons.CurrentWeapon.SetWeaponStats(weapons.CurrentWeapon.Stats); // 满弹匣、取消换弹
+        RangedWeapon weapon = weapons != null ? weapons.CurrentWeapon : null;
+        if (weapon != null && !weapon.IsReloading && weapon.CurrentAmmo < weapon.MaxAmmo)
+            weapon.SetWeaponStats(weapon.Stats);
 
         if (arenaBase != null)
             arenaBase.ResetBase();
