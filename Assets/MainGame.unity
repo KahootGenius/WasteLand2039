@@ -7718,7 +7718,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   availableWeapons:
-  - {fileID: 671756745073543927, guid: ee3cea9859eec594f93338ef19b9ba84, type: 3}
+  - {fileID: 1351552971237590023}
   currentWeaponIndex: 0
   useMouseAiming: 1
   aimPoint: {fileID: 0}
@@ -81942,6 +81942,17 @@ PrefabInstance:
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: ee3cea9859eec594f93338ef19b9ba84, type: 3}
+--- !u!114 &1351552971237590023 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 671756745073543927, guid: ee3cea9859eec594f93338ef19b9ba84, type: 3}
+  m_PrefabInstance: {fileID: 1351552971237590022}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ee780109b5cb74a4bada827859394b78, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1001 &1675964869001404781
 PrefabInstance:
   m_ObjectHideFlags: 0
