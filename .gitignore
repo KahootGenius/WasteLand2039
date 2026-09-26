@@ -61,3 +61,6 @@ MLTraining/builds/
 # ML-Agents writes timer files here when running in the Editor
 Assets/ML-Agents/
 Assets/ML-Agents.meta
+
+# Python bytecode (analysis / training scripts)
+__pycache__/
