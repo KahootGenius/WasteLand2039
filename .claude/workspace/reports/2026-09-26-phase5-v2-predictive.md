@@ -153,3 +153,20 @@ At bot flee decisions, predicting from the base (`--decisions`):
 3. **Still open:**
    - `kiteGapSeconds = 1.5`;
    - the weapon-asset bug, the animation events and the missing TMP font on `main`.
+
+## Update 2026-09-26: game fixes (both branches)
+
+At the user's request, three pre-existing bugs were fixed. The fixes are three small commits, cherry-picked to `main`, and `main` compiles with 0 errors.
+
+1. **TMP default font restored.** `LiberationSans SDF.asset` (standard GUID) was restored from TMP 3.0.7's Essential Resources; nothing else from the package was missing. All 52 TextMesh Pro texts in MainGame have their font again.
+2. **Weapon asset bug.** MainGame's `WeaponManager` now uses the Player's own `Weapon`. Checked in Play mode:
+   - it fires from the scene weapon;
+   - the fire point is placed 1 unit from the player;
+   - reload consumes one Bullet item (30 rounds);
+   - `Weapon.prefab` stays clean.
+
+   **Gameplay change:** reloads are no longer free. The starter kit (3 bullets) is given once per machine and has already been given here. To test, use the `StarterItemGiver` context menu *强制发放物资* in Play mode, or craft bullets.
+3. **Zombie animation events.** Empty receivers for `OnAttackHit` / `OnAttackComplete` / `OnDeathComplete` in `Enemy.cs`, with no behaviour change. No "no receiver" messages in about 500 game-seconds of arena play.
+
+Noticed, not changed: the Bullet item's display name is "New Item" (`Assets/Items/Bullet.asset`, `itemName`).
+

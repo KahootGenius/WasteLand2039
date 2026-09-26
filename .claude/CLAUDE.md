@@ -101,14 +101,15 @@ Scenes and flow: `Assets/MainMenu.unity` → `Assets/IntroScene.unity` (used as 
 - `SceneController.InitializeSceneSpecificSystems` has `case "GameScene":`, but the game scene is `MainGame`, so that branch never runs. It currently does nothing useful anyway (see the missing `GameManager` prefab above).
 - `HordeEvent_使用说明.txt` (project root) describes `DayManager` / `HordeSpawner`, which have since been removed or commented out. Horde config now lives on `GameTimer.dayHordeEvents`.
 - There are about 21 debug, fixer, tester, and demo scripts in `InventorySystem/`. The fixer scripts checked are not referenced by any scene, so they are likely leftovers.
-- **Weapon asset bug** (found 2026-09-25, not fixed on either branch). In `MainGame`, `Player > WeaponManager.availableWeapons[0]` references the prefab asset `Assets/Prefabs/Weapon.prefab`, not the Player's own child `Weapon`. Consequences:
-  - At runtime the game fires from and moves the asset; the asset's `Firepoint` gets moved every play session. The on-disk file already contains a stray offset.
-  - The asset has no `bulletItem`, so reloads are free and the child's inventory-ammo setup never applies.
-  - This is probably the root cause of the "abnormal cooldown" guards in `RangedWeapon.cs`.
-  - Suggested fix (the user's decision): drag the child `Weapon` into the list in `MainGame`.
-  - The arena player is already remapped to its own child weapon by the builder.
-  - **After playing MainGame, `Weapon.prefab` is dirty in memory.** Any project-wide `AssetDatabase.SaveAssets()` (or *File > Save Project*) then writes the moved `Firepoint` to disk. On 2026-09-25 an agent did exactly that and restored the file with `git checkout`.
-  - Reimport the prefab (`AssetDatabase.ImportAsset(path, ForceUpdate)`) before any project-wide save, and in editor code save only your own assets (`AssetDatabase.SaveAssetIfDirty(obj)`), as `ArenaAssetBuilder` now does.
+- **Fixed 2026-09-26 on both `main` and `experiment/enemy-ml`** (same three commits, cherry-picked):
+  - **Weapon asset bug.** MainGame's `WeaponManager.availableWeapons[0]` referenced the prefab asset `Assets/Prefabs/Weapon.prefab`, not the Player's own child `Weapon`, so the game fired from and moved the asset and reloads were free.
+    - It now references the child. Reloading takes one `Bullet` item (30 rounds) from the inventory. Starter kit: 3 bullets, given **once per machine** (PlayerPrefs `StarterItemsGiven`); in Play mode, the `StarterItemGiver` component's context menu *强制发放物资* gives them again. Bullets can be crafted.
+    - Playing MainGame no longer dirties `Weapon.prefab`. The asset keeps a stray `Firepoint` offset, which is harmless because `WeaponManager` places the fire point every frame. Still, in editor code, save only your own assets (`AssetDatabase.SaveAssetIfDirty`).
+  - **Zombie animation events.** `Enemy.cs` has empty receivers for `OnAttackHit`, `OnAttackComplete` and `OnDeathComplete` (001Z clips); behaviour is unchanged. This replaces the experiment-only `EnemyAI/Enemy.AnimationEvents.cs`.
+  - **TMP default font.** `Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF.asset` was missing (never committed), so 52 MainGame texts had no font. It's restored from TMP 3.0.7 Essential Resources with its standard GUID.
+    - Lesson: **saving a scene while an asset it references is missing rewrites those references to null.** Check `git diff` after any scene save.
+  - **Saving `MainGame` on the experiment branch** also writes experiment-only serialized fields (for example `HordeEventSpawner.mainBaseTransform`, `endlessWaves`, `commanderComponent`). Strip them before committing a scene change meant for `main`.
+  - Still open, for the user: `Assets/Items/Bullet.asset` has `itemName: New Item` (it shows as "New Item").
 
 ## Active work
 
@@ -125,7 +126,7 @@ Scenes and flow: `Assets/MainMenu.unity` → `Assets/IntroScene.unity` (used as 
     - `PredictiveCommander` with `FrequencyPredictor` passes the §4 test. The ambush is on the bot's route at 83% of RunnerA / 48% of RunnerB80 flee decisions (chance 33%), and RunnerB80's ambush rate rises from wave 1 to 4. It stays near Baseline lethality for non-runners.
     - The learned predictor is more accurate at flee onset (it uses the live threat), but not for an ambush placed in advance; it ships as an option.
     - MainGame is still on Baseline (menu *Game Commander: V2 (Predictive)*). Next: plan Phase 6 (evaluation, human playtests), the user's call.
-  - **Pending the user's review:** the tracker's `kiteGapSeconds = 1.5` (it changes the Phase 2 Kite definition; 0 reverts it), and whether to fix the weapon-asset bug and the zombie animation events on `main`. The experiment branch silences the animation events with empty receivers (`EnemyAI/Enemy.AnimationEvents.cs`), because the error flood slowed training.
+  - **Pending the user's review:** the tracker's `kiteGapSeconds = 1.5` (it changes the Phase 2 Kite definition; 0 reverts it). The weapon-asset bug, the animation events and the missing TMP font were fixed on both branches on 2026-09-26, at the user's request.
   - **Open question 3, decided 2026-09-26:** persist the player profile across sessions, behind a switch. Implemented and play-tested the same day (see *Player model at runtime*).
   - The user says this is **experimental**. They have **another design of their own that they expect to perform better**. Keep the ML work isolated (new files, thin hooks, experiment branch), and don't push it into `main` or into their design.
   - Training files will live in `MLTraining/` at the repo root, outside `Assets/`.
