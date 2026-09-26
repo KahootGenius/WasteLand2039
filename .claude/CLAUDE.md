@@ -103,14 +103,16 @@ Scenes and flow: `Assets/MainMenu.unity` → `Assets/IntroScene.unity` (used as 
 - There are about 21 debug, fixer, tester, and demo scripts in `InventorySystem/`. The fixer scripts checked are not referenced by any scene, so they are likely leftovers.
 - **Fixed 2026-09-26 on both `main` and `experiment/enemy-ml`** (same three commits, cherry-picked):
   - **Weapon asset bug.** MainGame's `WeaponManager.availableWeapons[0]` referenced the prefab asset `Assets/Prefabs/Weapon.prefab`, not the Player's own child `Weapon`, so the game fired from and moved the asset and reloads were free.
-    - It now references the child. Reloading takes one `Bullet` item (30 rounds) from the inventory. Starter kit: 3 bullets, given **once per machine** (PlayerPrefs `StarterItemsGiven`); in Play mode, the `StarterItemGiver` component's context menu *强制发放物资* gives them again. Bullets can be crafted.
+    - It now references the child. Reloading takes one `Bullet` item (30 rounds) from the inventory. Starter kit: 3 bullets, given at **every start of MainGame** (see the inventory note below); in Play mode, the `StarterItemGiver` component's context menu *强制发放物资* gives them again. Bullets can be crafted.
     - Playing MainGame no longer dirties `Weapon.prefab`. The asset keeps a stray `Firepoint` offset, which is harmless because `WeaponManager` places the fire point every frame. Still, in editor code, save only your own assets (`AssetDatabase.SaveAssetIfDirty`).
   - **Zombie animation events.** `Enemy.cs` has empty receivers for `OnAttackHit`, `OnAttackComplete` and `OnDeathComplete` (001Z clips); behaviour is unchanged. This replaces the experiment-only `EnemyAI/Enemy.AnimationEvents.cs`.
   - **TMP default font.** `Assets/TextMesh Pro/Resources/Fonts & Materials/LiberationSans SDF.asset` was missing (never committed), so 52 MainGame texts had no font. It's restored from TMP 3.0.7 Essential Resources with its standard GUID.
     - Lesson: **saving a scene while an asset it references is missing rewrites those references to null.** Check `git diff` after any scene save.
   - **Saving `MainGame` on the experiment branch** also writes experiment-only serialized fields (for example `HordeEventSpawner.mainBaseTransform`, `endlessWaves`, `commanderComponent`). Strip them before committing a scene change meant for `main`.
   - The Bullet item's display name was the default "New Item"; it is now "Bullet" (both branches).
-  - **The inventory is not saved between sessions.** Only these are saved: the day (`GameDataManager`, MainMenu only), unlocked recipes (`CraftingManager`) and the starter-kit flag (`StarterItemGiver`, PlayerPrefs). So after a machine's first session, every Play starts with an empty inventory. Whether to give the kit per new game, or to save the inventory, is the user's call.
+  - **The inventory is not saved between sessions.** Only the day (`GameDataManager`, MainMenu only; nothing restores it, `GameTimer` starts at day 1) and unlocked recipes (`CraftingManager`) are saved, so every start of MainGame is in effect a new game.
+    - **Decided 2026-09-26 (user): give the starter kit every new game.** MainGame's `StarterItemGiver.giveItemsOnlyOnce` is off (both branches), so the kit comes with every start of MainGame. The machine-wide PlayerPrefs flag `StarterItemsGiven` is no longer checked (it is still set on the user's Mac; harmless).
+    - Edge case: `InventoryManager` is `DontDestroyOnLoad`, so going back to the main menu and into the game again **in the same run** keeps the in-memory inventory (and, from the code, loses its link to the new scene's inventory UI), and now adds another kit on top. Revisit this if the inventory is ever saved or "Continue" starts restoring state.
 
 ## Active work
 
@@ -127,7 +129,7 @@ Scenes and flow: `Assets/MainMenu.unity` → `Assets/IntroScene.unity` (used as 
     - `PredictiveCommander` with `FrequencyPredictor` passes the §4 test. The ambush is on the bot's route at 83% of RunnerA / 48% of RunnerB80 flee decisions (chance 33%), and RunnerB80's ambush rate rises from wave 1 to 4. It stays near Baseline lethality for non-runners.
     - The learned predictor is more accurate at flee onset (it uses the live threat), but not for an ambush placed in advance; it ships as an option.
     - MainGame is still on Baseline (menu *Game Commander: V2 (Predictive)*). Next: plan Phase 6 (evaluation, human playtests), the user's call.
-  - **Pending the user's review:** the tracker's `kiteGapSeconds = 1.5` (it changes the Phase 2 Kite definition; 0 reverts it). The weapon-asset bug, the animation events and the missing TMP font were fixed on both branches on 2026-09-26, at the user's request.
+  - **Decided 2026-09-26 (user): keep** the tracker's `kiteGapSeconds = 1.5` (it changes the Phase 2 Kite definition; 0 reverts it). The weapon-asset bug, the animation events and the missing TMP font were fixed on both branches on 2026-09-26, at the user's request.
   - **Open question 3, decided 2026-09-26:** persist the player profile across sessions, behind a switch. Implemented and play-tested the same day (see *Player model at runtime*).
   - The user says this is **experimental**. They have **another design of their own that they expect to perform better**. Keep the ML work isolated (new files, thin hooks, experiment branch), and don't push it into `main` or into their design.
   - Training files will live in `MLTraining/` at the repo root, outside `Assets/`.

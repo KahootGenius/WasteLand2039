@@ -229,7 +229,7 @@ Full write-up: `reports/2026-09-25-phase3-arena-bots.md`.
   - Logic tests: all pass, including every persona in a simulated arena.
   - Unity: 8 arenas at 8× for about 40 game-minutes each; every persona produced its expected profile signature (report §Verification).
   - MainGame smoke test through MCP: unchanged behaviour.
-- **Changed the Phase 2 classifier (review).** `EngagementSettings.kiteGapSeconds = 1.5`: stopping to shoot within an escape counts as Kite. Otherwise kiting is invisible in this game: Kite 8% → 19%, and 0 of 3 → 11 of 14 escapes typed Kite. Set it to 0 to revert.
+- **Changed the Phase 2 classifier (review).** `EngagementSettings.kiteGapSeconds = 1.5`: stopping to shoot within an escape counts as Kite. Otherwise kiting is invisible in this game: Kite 8% → 19%, and 0 of 3 → 11 of 14 escapes typed Kite. Set it to 0 to revert. **Kept by the user on 2026-09-26.**
 - **Found (game bugs, also on `main`, not fixed).**
   - `WeaponManager.availableWeapons` references the `Weapon.prefab` asset: the arenas shared one gun, MainGame writes to the asset, and reloads are free.
   - The `001Z_Attack` animation events have no receiver.

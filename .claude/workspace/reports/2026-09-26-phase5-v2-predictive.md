@@ -150,9 +150,7 @@ At bot flee decisions, predicting from the base (`--decisions`):
    - human playtests (the §7 questionnaire), which is where the learned predictor might show its value;
    - more personas that react to threats;
    - an Adaptive-specific counter (randomize between the top two routes).
-3. **Still open:**
-   - `kiteGapSeconds = 1.5`;
-   - the weapon-asset bug, the animation events and the missing TMP font on `main`.
+3. **Still open:** nothing from this list. *(Update 2026-09-26: the user kept `kiteGapSeconds = 1.5`; the weapon-asset bug, the animation events and the missing TMP font were fixed on both branches, see below.)*
 
 ## Update 2026-09-26: game fixes (both branches)
 
@@ -165,8 +163,10 @@ At the user's request, three pre-existing bugs were fixed. The fixes are three s
    - reload consumes one Bullet item (30 rounds);
    - `Weapon.prefab` stays clean.
 
-   **Gameplay change:** reloads are no longer free. The starter kit (3 bullets) is given once per machine and has already been given here. To test, use the `StarterItemGiver` context menu *强制发放物资* in Play mode, or craft bullets.
+   **Gameplay change:** reloads are no longer free. The starter kit (3 bullets) was given once per machine; since the follow-up below it comes with every start of MainGame.
 3. **Zombie animation events.** Empty receivers for `OnAttackHit` / `OnAttackComplete` / `OnDeathComplete` in `Enemy.cs`, with no behaviour change. No "no receiver" messages in about 500 game-seconds of arena play.
 
 Noticed, not changed: the Bullet item's display name is "New Item" (`Assets/Items/Bullet.asset`, `itemName`).
+
+Follow-ups the same day (both branches): the Bullet item is named "Bullet"; the spawn-ring fix and the `VERBOSE_LOGS` log gating were cherry-picked to `main`; and, at the user's decision, the starter kit is given at every start of MainGame (`StarterItemGiver.giveItemsOnlyOnce` off; checked in Play mode: 3 bullets with the old PlayerPrefs flag still set). The user also kept `kiteGapSeconds = 1.5`.
 
