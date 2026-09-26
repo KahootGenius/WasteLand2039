@@ -18019,7 +18019,7 @@ MonoBehaviour:
     amount: 3
     description: 
   giveItemsOnStart: 1
-  giveItemsOnlyOnce: 1
+  giveItemsOnlyOnce: 0
   saveKey: StarterItemsGiven
   enableDebugLog: 1
   showGiveItemsButton: 1
