@@ -12,7 +12,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: b1a58ea1bd595bf4c886c658acd2ae58, type: 3}
   m_Name: Bullet
   m_EditorClassIdentifier: 
-  itemName: New Item
+  itemName: Bullet
   icon: {fileID: 21300000, guid: bf7292d4d39df484f8d72a5f153b4ecb, type: 3}
   description: Bullet suitable for pistols and rifles
   itemType: 3
