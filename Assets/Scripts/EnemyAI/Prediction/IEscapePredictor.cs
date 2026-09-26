@@ -11,18 +11,20 @@ public class PredictionInput
 }
 
 /// <summary>
-/// V2 的逃跑预测器（纯逻辑）：预测玩家下一次逃跑的终点区域分布。
+/// V2 的逃跑预测器（纯逻辑）：预测玩家下一次逃跑的方向（8 个方向扇区，0 = 东，逆时针，与 EscapeSectors 一致）。
+/// 预测方向而不是终点区域：区域以基地为中心划分，而玩家不一定从基地正中起跑，提前结束的逃跑会落在相邻扇区的区域里；
+/// 逃跑的位移方向更接近玩家选择的路线。
 /// 实现：FrequencyPredictor（按画像统计，无训练）、LearnedPredictor（离线训练的 softmax 回归）
 /// </summary>
 public interface IEscapePredictor
 {
     string Name { get; }
 
-    /// <summary>把各区域的概率（和为 1）写入 zoneProbabilities（长度 = 区域数）</summary>
-    void Predict(PredictionInput input, float[] zoneProbabilities);
+    /// <summary>把各方向的概率（和为 1）写入 directionProbabilities（长度 EscapeSectors.Count）</summary>
+    void Predict(PredictionInput input, float[] directionProbabilities);
 }
 
-/// <summary>区域 → 方向扇区（8 个，0 = 东，逆时针），适用于任何 IZoneMap（按区域代表点相对中心区的方向）</summary>
+/// <summary>方向扇区（8 个，0 = 东，逆时针）；区域 → 扇区适用于任何 IZoneMap（按区域代表点相对中心区的方向）</summary>
 public static class EscapeSectors
 {
     public const int Count = 8;
@@ -34,22 +36,6 @@ public static class EscapeSectors
             return -1;
         Vector2 direction = zones.GetZoneCenter(zone) - zones.GetZoneCenter(0);
         return direction.sqrMagnitude < 0.0001f ? -1 : RadialZoneMap.DirectionToSector(direction, Count);
-    }
-
-    /// <summary>把区域概率按扇区相加（长度 Count）；返回落在中心区的概率</summary>
-    public static float Aggregate(IZoneMap zones, float[] zoneProbabilities, float[] sectorProbabilities)
-    {
-        System.Array.Clear(sectorProbabilities, 0, Count);
-        float core = 0f;
-        for (int zone = 0; zone < zoneProbabilities.Length && zone < zones.ZoneCount; zone++)
-        {
-            int sector = SectorOf(zones, zone);
-            if (sector < 0)
-                core += zoneProbabilities[zone];
-            else
-                sectorProbabilities[sector] += zoneProbabilities[zone];
-        }
-        return core;
     }
 
     /// <summary>概率最高的扇区（全为 0 时返回 -1）；second 为第二高</summary>
