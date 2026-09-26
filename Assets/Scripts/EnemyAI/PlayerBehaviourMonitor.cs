@@ -129,6 +129,7 @@ public class PlayerBehaviourMonitor : MonoBehaviour
     private int trackedEscapeId = -1;
     private float escapeMinEnemyDistance = float.PositiveInfinity;
     private GUIStyle overlayStyle;
+    private float[] escapeFeatures;
     private bool profilePersistent;
     private string profileScene;
     private int profileSessions;
@@ -445,12 +446,19 @@ public class PlayerBehaviourMonitor : MonoBehaviour
         foreach (Vector2 position in enemyPositions)
             enemyZones.Add(zoneMap.GetZoneName(zoneMap.GetZone(position)));
 
+        // V2 逃跑预测器的输入特征（起跑时刻；画像尚未计入本次逃跑）：离线训练直接读取，与游戏中的推理完全一致
+        if (escapeFeatures == null || escapeFeatures.Length != EscapeFeatures.Size(zoneMap.ZoneCount))
+            escapeFeatures = new float[EscapeFeatures.Size(zoneMap.ZoneCount)];
+        EscapeFeatures.Build(profile, escape.StartZone, escape.StartPosition, enemyPositions,
+            engagementSettings.threatRadius, escapeFeatures);
+
         telemetry.Event("escape_start", escape.StartTime)
             .Add("id", escape.Id)
             .Add("engagement", escape.EngagementId)
             .Add("zone", zoneMap.GetZoneName(escape.StartZone))
             .Add("x", escape.StartPosition.x).Add("y", escape.StartPosition.y)
             .Add("enemy_zones", enemyZones)
+            .Add("features", escapeFeatures)
             .Write();
     }
 
@@ -524,7 +532,7 @@ public class PlayerBehaviourMonitor : MonoBehaviour
                 zoneNames.Add(zoneMap.GetZoneName(z));
 
             string session = JsonLine.Standalone()
-                .Add("format_version", 2) // 2：escape_end 的逃跑类型改名 escape_type；escape_start 加 enemy_zones；escape_end 加 intercepted
+                .Add("format_version", 3) // 2：escape_end 的逃跑类型改名 escape_type；escape_start 加 enemy_zones；escape_end 加 intercepted。3：escape_start 加 features（EscapeFeatures）
                 .Add("created", DateTime.Now.ToString("o"))
                 .Add("scene", sceneName)
                 .Add("tag", sessionTag)
