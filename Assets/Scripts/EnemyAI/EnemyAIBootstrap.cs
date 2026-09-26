@@ -6,8 +6,8 @@ using UnityEngine.SceneManagement;
 /// 实验分支的自动装配（每次加载场景时，无需修改场景）：
 /// 1. 为没有监测组件的 HordeEventSpawner 添加 PlayerBehaviourMonitor，采集玩家行为数据。
 ///    若场景中已手动放置 PlayerBehaviourMonitor（例如想调整参数或关闭遥测），则不做自动添加。
-/// 2. EnemyAISettings 选择 RL 且有模型时，为没有指定指挥官的 HordeEventSpawner 添加 RLCommander（只推理）。
-///    训练场（有 ArenaManager 的场景）不受影响。
+/// 2. EnemyAISettings 选择 RL（且有模型）或 V2 时，为没有指定指挥官的 HordeEventSpawner 添加
+///    RLCommander（只推理）或 PredictiveCommander。训练场（有 ArenaManager 的场景）不受影响。
 /// </summary>
 public static class EnemyAIBootstrap
 {
@@ -28,15 +28,31 @@ public static class EnemyAIBootstrap
                 spawner.gameObject.AddComponent<PlayerBehaviourMonitor>();
         }
 
-        if (Object.FindObjectOfType<ArenaManager>() == null)
-            InstallLearnedCommander(spawners);
+        if (Object.FindObjectOfType<ArenaManager>() != null)
+            return;
+        EnemyAISettings settings = EnemyAISettings.Load();
+        if (settings == null)
+            return;
+        if (settings.gameCommander == EnemyAISettings.CommanderChoice.RL)
+            InstallLearnedCommander(settings, spawners);
+        else if (settings.gameCommander == EnemyAISettings.CommanderChoice.Predictive)
+            InstallPredictiveCommander(settings, spawners);
     }
 
-    private static void InstallLearnedCommander(HordeEventSpawner[] spawners)
+    private static void InstallPredictiveCommander(EnemyAISettings settings, HordeEventSpawner[] spawners)
     {
-        EnemyAISettings settings = EnemyAISettings.Load();
-        if (settings == null || settings.gameCommander != EnemyAISettings.CommanderChoice.RL)
-            return;
+        foreach (HordeEventSpawner spawner in spawners)
+        {
+            if (spawner.HasAssignedCommander || spawner.GetComponent<IHordeCommander>() != null)
+                continue;
+            var commander = spawner.gameObject.AddComponent<PredictiveCommander>();
+            commander.Configure(settings.v2Predictor, settings.v2LearnedWeights);
+            Debug.Log($"[EnemyAIBootstrap] {spawner.name}: 使用 V2 指挥官（{commander.DisplayName}）");
+        }
+    }
+
+    private static void InstallLearnedCommander(EnemyAISettings settings, HordeEventSpawner[] spawners)
+    {
         if (settings.rlModel == null)
         {
             Debug.LogWarning("[EnemyAIBootstrap] EnemyAISettings 选择了 RL 指挥官，但没有模型；使用基准指挥官");

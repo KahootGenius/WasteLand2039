@@ -14,7 +14,9 @@ public class EnemyAISettings : ScriptableObject
         /// <summary>原版行为（对照组）</summary>
         Baseline,
         /// <summary>V1 强化学习指挥官（需要 rlModel）</summary>
-        RL
+        RL,
+        /// <summary>V2 预测 + 规则指挥官（PredictiveCommander）</summary>
+        Predictive
     }
 
     public const string ResourcePath = "EnemyAISettings";
@@ -24,6 +26,12 @@ public class EnemyAISettings : ScriptableObject
 
     [Tooltip("RL 指挥官使用的模型（Tools > Enemy AI > Install Latest Commander Model 会自动设置）")]
     public Unity.Sentis.ModelAsset rlModel;
+
+    [Tooltip("V2 指挥官使用的预测器（统计 = 按画像计数；学习型 = 离线训练的模型，需要 v2LearnedWeights）")]
+    public PredictiveCommander.PredictorChoice v2Predictor = PredictiveCommander.PredictorChoice.Frequency;
+
+    [Tooltip("V2 学习型预测器的参数（Assets/ML/Predictors/*.json）")]
+    public TextAsset v2LearnedWeights;
 
     [Tooltip("玩家画像跨会话保存（每个场景一个文件，见 PlayerProfileStore）。关闭 = 每次进入游戏从零开始学习玩家")]
     public bool persistPlayerProfile = true;
