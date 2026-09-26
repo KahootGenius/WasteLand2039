@@ -11,6 +11,7 @@ using UnityEngine.SceneManagement;
 ///
 /// 实验分支上由 EnemyAIBootstrap 自动添加到 HordeEventSpawner 所在物体（无需修改场景）；
 /// 若场景中已手动放置本组件，则不会自动添加。
+/// 玩家画像默认跨会话保存（PlayerProfileStore；开关在 EnemyAISettings），训练场除外。
 /// 游戏中按 ` 键（Esc 下方）显示 / 隐藏调试面板。
 /// </summary>
 [DisallowMultipleComponent]
@@ -38,6 +39,8 @@ public class PlayerBehaviourMonitor : MonoBehaviour
 
     [Header("玩家画像")]
     [SerializeField] private ProfileSettings profileSettings = new ProfileSettings();
+    [Tooltip("允许跨会话保存 / 读取画像（还需 EnemyAISettings.persistPlayerProfile 开启）。训练场会自动关闭")]
+    [SerializeField] private bool persistProfile = true;
 
     [Header("评估指标（与 CommanderRewardSettings 的默认值一致）")]
     [Tooltip("逃跑途中（起跑 interceptGraceSeconds 秒后）有敌人进入此半径 = 被拦截")]
@@ -86,6 +89,16 @@ public class PlayerBehaviourMonitor : MonoBehaviour
         set => writeSamples = value;
     }
 
+    /// <summary>是否允许跨会话保存 / 读取画像（还需 EnemyAISettings 开启）；只在 Start 之前设置有效</summary>
+    public bool PersistProfile
+    {
+        get => persistProfile;
+        set => persistProfile = value;
+    }
+
+    /// <summary>本会话是否在读写保存的画像</summary>
+    public bool ProfileIsPersistent => profilePersistent;
+
     public bool ShowOverlay
     {
         get => showOverlay;
@@ -116,6 +129,11 @@ public class PlayerBehaviourMonitor : MonoBehaviour
     private int trackedEscapeId = -1;
     private float escapeMinEnemyDistance = float.PositiveInfinity;
     private GUIStyle overlayStyle;
+    private bool profilePersistent;
+    private string profileScene;
+    private int profileSessions;
+    private string profileOrigin = "新画像";
+    private bool profileSaveWarned;
 
     // ---------- 生命周期 ----------
 
@@ -165,6 +183,10 @@ public class PlayerBehaviourMonitor : MonoBehaviour
         if (mainBase != null)
             tracker.BasePosition = mainBase.position;
         profile = new PlayerProfile(zoneMap.ZoneCount, profileSettings);
+        profileScene = gameObject.scene.name;
+        profilePersistent = persistProfile && EnemyAISettings.PersistPlayerProfile;
+        if (profilePersistent)
+            LoadSavedProfile();
 
         tracker.EngagementStarted += HandleEngagementStarted;
         tracker.EngagementEnded += HandleEngagementEnded;
@@ -193,6 +215,8 @@ public class PlayerBehaviourMonitor : MonoBehaviour
 
         if (writeTelemetry)
             OpenTelemetry(mainBase);
+        if (profile.Escapes > 0 || profile.Engagements > 0)
+            WriteProfileSnapshot("loaded");
     }
 
     private void Update()
@@ -217,8 +241,10 @@ public class PlayerBehaviourMonitor : MonoBehaviour
 
     private void OnApplicationPause(bool paused)
     {
-        if (paused)
-            telemetry?.Flush();
+        if (!paused)
+            return;
+        telemetry?.Flush();
+        SaveProfile();
     }
 
     private void OnDestroy()
@@ -363,6 +389,7 @@ public class PlayerBehaviourMonitor : MonoBehaviour
     {
         telemetry?.Event("wave_end", Time.time).Add("wave", waveIndex).Write();
         WriteProfileSnapshot("wave_end");
+        SaveProfile();
     }
 
     private void HandleWaveAborted(HordeEvent hordeEvent)
@@ -372,6 +399,7 @@ public class PlayerBehaviourMonitor : MonoBehaviour
             tracker.ForceEnd(lastSample);
         telemetry?.Event("wave_abort", Time.time).Add("wave", waveIndex).Write();
         WriteProfileSnapshot("wave_abort");
+        SaveProfile();
     }
 
     private void HandleEngagementStarted(EngagementSummary engagement)
@@ -524,6 +552,10 @@ public class PlayerBehaviourMonitor : MonoBehaviour
                 .Add("kite_gap_seconds", engagementSettings.kiteGapSeconds)
                 .Add("engagement_decay", profileSettings.engagementDecay)
                 .Add("escape_decay", profileSettings.escapeDecay)
+                .Add("profile_persistent", profilePersistent)
+                .Add("profile_session", profileSessions)
+                .Add("profile_origin", profileOrigin)
+                .Add("profile_escapes_at_start", profile.Escapes)
                 .ToString();
             telemetry.WriteJsonFile("session.json", session);
 
@@ -617,6 +649,8 @@ public class PlayerBehaviourMonitor : MonoBehaviour
             tracker.StateChanged -= HandleStateChanged;
         }
 
+        SaveProfile();
+
         if (weaponManager != null)
             weaponManager.OnWeaponFired -= HandleWeaponFired;
         Enemy.AnyDied -= HandleEnemyDied;
@@ -666,6 +700,45 @@ public class PlayerBehaviourMonitor : MonoBehaviour
         }
     }
 
+    // ---------- 跨会话画像 ----------
+
+    private void LoadSavedProfile()
+    {
+        PlayerProfileStore.SavedProfile saved = PlayerProfileStore.Load(profileScene, ZoneNames(), out string error);
+        if (saved != null && profile.TryImportState(saved.profile, out error))
+        {
+            profileSessions = saved.sessions + 1;
+            profileOrigin = $"第 {profileSessions} 次会话，沿用上次保存（{saved.savedAt}）";
+            Debug.Log($"[PlayerBehaviourMonitor] 载入保存的玩家画像：{profile.Engagements} 次交战，{profile.Escapes} 次逃跑，" +
+                      $"第 {profileSessions} 次会话（{PlayerProfileStore.PathFor(profileScene)}）");
+            return;
+        }
+
+        profileSessions = 1;
+        profileOrigin = error == null ? "新画像（第 1 次会话）" : "新画像（保存的画像不可用）";
+        if (error != null)
+            Debug.LogWarning($"[PlayerBehaviourMonitor] 不使用保存的玩家画像，从零开始：{error}", this);
+    }
+
+    private void SaveProfile()
+    {
+        if (!profilePersistent || profile == null)
+            return;
+        if (!PlayerProfileStore.Save(profileScene, ZoneNames(), profileSessions, profile, out string error) && !profileSaveWarned)
+        {
+            profileSaveWarned = true;
+            Debug.LogWarning($"[PlayerBehaviourMonitor] 保存玩家画像失败：{error}", this);
+        }
+    }
+
+    private string[] ZoneNames()
+    {
+        var names = new string[zoneMap.ZoneCount];
+        for (int z = 0; z < names.Length; z++)
+            names[z] = zoneMap.GetZoneName(z);
+        return names;
+    }
+
     // ---------- 辅助 ----------
 
     private string CommanderName()
@@ -706,7 +779,7 @@ public class PlayerBehaviourMonitor : MonoBehaviour
             "敌人AI监测" + (overlayKey != KeyCode.None ? $"  （按 {overlayKey} 隐藏）" : "") + "\n" +
             $"指挥官: {CommanderName()}   波次: {waveIndex}   区域: {zoneMap.GetZoneName(tracker.CurrentZone)}\n" +
             $"状态: {tracker.State}   交战 #{tracker.CurrentEngagementId}   撤退 {tracker.RetreatRatio:F2}   射速 {tracker.ShotRate:F1}/s\n" +
-            "—— 玩家画像 ——\n" +
+            "—— 玩家画像 ——" + (profilePersistent ? $"  （跨会话保存；{profileOrigin}）" : "  （不跨会话保存）") + "\n" +
             profile.Describe(zoneMap) +
             (OverlayExtra != null ? OverlayExtra() + "\n" : "") +
             (telemetry != null ? $"遥测: {telemetry.DirectoryPath}" : "遥测: 未记录");

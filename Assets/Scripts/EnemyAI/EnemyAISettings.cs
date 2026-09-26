@@ -2,8 +2,9 @@ using UnityEngine;
 
 /// <summary>
 /// 实验分支的敌人 AI 设置（Assets/ML/Resources/EnemyAISettings.asset，按名称从 Resources 加载）。
-/// 决定正常游戏场景（MainGame 等）使用哪个指挥官；训练场场景不受影响（它们在预制体里指定指挥官）。
-/// 找不到此资产时一律使用基准指挥官（原版行为）。
+/// 决定正常游戏场景（MainGame 等）使用哪个指挥官，以及玩家画像是否跨会话保存；
+/// 训练场场景不受影响（它们在预制体里指定指挥官，画像每回合重置）。
+/// 找不到此资产时使用基准指挥官（原版行为），画像跨会话保存。
 /// </summary>
 [CreateAssetMenu(fileName = "EnemyAISettings", menuName = "Enemy AI/Enemy AI Settings")]
 public class EnemyAISettings : ScriptableObject
@@ -24,8 +25,21 @@ public class EnemyAISettings : ScriptableObject
     [Tooltip("RL 指挥官使用的模型（Tools > Enemy AI > Install Latest Commander Model 会自动设置）")]
     public Unity.Sentis.ModelAsset rlModel;
 
+    [Tooltip("玩家画像跨会话保存（每个场景一个文件，见 PlayerProfileStore）。关闭 = 每次进入游戏从零开始学习玩家")]
+    public bool persistPlayerProfile = true;
+
     public static EnemyAISettings Load()
     {
         return Resources.Load<EnemyAISettings>(ResourcePath);
+    }
+
+    /// <summary>当前设置是否跨会话保存玩家画像（找不到设置资产时为 true）</summary>
+    public static bool PersistPlayerProfile
+    {
+        get
+        {
+            EnemyAISettings settings = Load();
+            return settings == null || settings.persistPlayerProfile;
+        }
     }
 }

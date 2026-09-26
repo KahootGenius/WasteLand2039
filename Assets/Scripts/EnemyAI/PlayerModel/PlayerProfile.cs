@@ -17,6 +17,27 @@ public class ProfileSettings
 }
 
 /// <summary>
+/// 玩家画像的可序列化状态（跨会话保存用，见 PlayerProfileStore）。只含数据，不含设置（衰减系数等取当前设置）
+/// </summary>
+[Serializable]
+public class PlayerProfileState
+{
+    public int version = 1;
+    public int zoneCount;
+    public int engagements;
+    public int escapes;
+    public float[] stateSeconds;
+    public float[] destinationWeights;
+    public float[] directionWeights;
+    public int[] routeFrom;
+    public int[] routeTo;
+    public float[] routeWeights;
+    public float meanEscapeDistance;
+    public float towardBaseRate;
+    public float gotAwayRate;
+}
+
+/// <summary>
 /// 玩家画像（"学到的玩家模式"）：由 EngagementTracker 的交战汇总和逃跑记录在线更新，带遗忘（衰减）。
 /// 纯逻辑，可在 Unity 外测试。所有指挥官（基准 / V1 / V2）读取同一份画像。
 ///
@@ -109,6 +130,74 @@ public class PlayerProfile
         GotAwayRate += alpha * (gotAway - GotAwayRate);
 
         Updated?.Invoke(this);
+    }
+
+    // ---------- 保存 / 恢复 ----------
+
+    /// <summary>导出当前状态（副本，之后的更新不影响它）</summary>
+    public PlayerProfileState ExportState()
+    {
+        var state = new PlayerProfileState
+        {
+            zoneCount = ZoneCount,
+            engagements = Engagements,
+            escapes = Escapes,
+            stateSeconds = (float[])stateSeconds.Clone(),
+            destinationWeights = (float[])destinationWeights.Clone(),
+            directionWeights = (float[])directionWeights.Clone(),
+            routeFrom = new int[routeWeights.Count],
+            routeTo = new int[routeWeights.Count],
+            routeWeights = new float[routeWeights.Count],
+            meanEscapeDistance = MeanEscapeDistance,
+            towardBaseRate = TowardBaseRate,
+            gotAwayRate = GotAwayRate
+        };
+        int i = 0;
+        foreach (var pair in routeWeights)
+        {
+            state.routeFrom[i] = (int)(pair.Key >> 32);
+            state.routeTo[i] = (int)(pair.Key & 0xffffffff);
+            state.routeWeights[i] = pair.Value;
+            i++;
+        }
+        return state;
+    }
+
+    /// <summary>
+    /// 用保存的状态替换当前数据。区域数或数组长度不符（分区设置变了）时不做任何修改并返回 false
+    /// </summary>
+    public bool TryImportState(PlayerProfileState state, out string error)
+    {
+        error = null;
+        if (state == null)
+            error = "没有数据";
+        else if (state.version != 1)
+            error = $"不支持的版本 {state.version}";
+        else if (state.zoneCount != ZoneCount)
+            error = $"区域数 {state.zoneCount} ≠ 当前 {ZoneCount}";
+        else if (state.stateSeconds == null || state.stateSeconds.Length != stateSeconds.Length ||
+                 state.destinationWeights == null || state.destinationWeights.Length != ZoneCount ||
+                 state.directionWeights == null || state.directionWeights.Length != DirectionBins)
+            error = "数组长度不符";
+        else if (state.routeFrom == null || state.routeTo == null || state.routeWeights == null ||
+                 state.routeFrom.Length != state.routeWeights.Length || state.routeTo.Length != state.routeWeights.Length)
+            error = "路线数据不完整";
+        if (error != null)
+            return false;
+
+        Engagements = Mathf.Max(0, state.engagements);
+        Escapes = Mathf.Max(0, state.escapes);
+        Array.Copy(state.stateSeconds, stateSeconds, stateSeconds.Length);
+        Array.Copy(state.destinationWeights, destinationWeights, ZoneCount);
+        Array.Copy(state.directionWeights, directionWeights, DirectionBins);
+        routeWeights.Clear();
+        for (int i = 0; i < state.routeWeights.Length; i++)
+            routeWeights[RouteKey(state.routeFrom[i], state.routeTo[i])] = state.routeWeights[i];
+        MeanEscapeDistance = state.meanEscapeDistance;
+        TowardBaseRate = state.towardBaseRate;
+        GotAwayRate = state.gotAwayRate;
+        Updated?.Invoke(this);
+        return true;
     }
 
     // ---------- 查询 ----------

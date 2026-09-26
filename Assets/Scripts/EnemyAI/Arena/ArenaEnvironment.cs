@@ -128,6 +128,9 @@ public class ArenaEnvironment : MonoBehaviour
     {
         if (monitor != null && string.IsNullOrEmpty(monitor.SessionTag))
             monitor.SessionTag = "arena_" + (persona != null ? persona.name : "human");
+        // 训练场每回合重置画像，从不读写跨会话保存的画像（否则评估结果取决于上次运行）
+        if (monitor != null)
+            monitor.PersistProfile = false;
         if (bot != null)
             bot.SetEnemySource(spawner);
     }

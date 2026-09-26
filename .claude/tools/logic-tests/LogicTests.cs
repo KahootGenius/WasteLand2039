@@ -28,6 +28,7 @@ static partial class LogicTests
         TelemetryFormatTest();
         BotTests();
         CommanderLearningTests();
+        ProfilePersistenceTests();
 
         Console.WriteLine();
         Console.WriteLine(failures == 0 ? "ALL PASSED" : $"{failures} FAILED");
