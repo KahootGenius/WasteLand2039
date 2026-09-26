@@ -44,6 +44,9 @@ public static class ArenaAssetBuilder
     private const int TrainingWavesPerEpisode = 4;
     private const string EvalBaselineScenePath = ArenaFolder + "/MLArena_Eval_Baseline.unity";
     private const string EvalRLScenePath = ArenaFolder + "/MLArena_Eval_RL.unity";
+    private const string ArenaV2Path = PrefabFolder + "/Arena_V2.prefab";
+    private const string EvalV2ScenePath = ArenaFolder + "/MLArena_Eval_V2.unity";
+    private const string DataScenePath = ArenaFolder + "/MLArena_Data.unity";
     private const string ModelFolder = Root + "/Models";
     private const string SettingsFolder = Root + "/Resources";
     private const string SettingsPath = SettingsFolder + "/" + EnemyAISettings.ResourcePath + ".asset";
@@ -106,13 +109,14 @@ public static class ArenaAssetBuilder
             bool needArena = !File.Exists(ArenaPath);
             bool needScene = !File.Exists(ScenePath);
             bool needRLScene = !File.Exists(RLScenePath);
-            bool needEvalScenes = !File.Exists(EvalBaselineScenePath) || !File.Exists(EvalRLScenePath);
+            bool needEvalScenes = !File.Exists(EvalBaselineScenePath) || !File.Exists(EvalRLScenePath) || !File.Exists(EvalV2ScenePath);
+            bool needDataScene = !File.Exists(DataScenePath);
 
             // 从 MainGame 读取玩家、基地和全局光（只读；在预览场景中复制，不会弄脏 MainGame）
             GameObject sourcePlayer = null;
             GameObject sourceBase = null;
             Component sourceLight = null;
-            if (needPlayer || needArena || needScene || needRLScene || needEvalScenes)
+            if (needPlayer || needArena || needScene || needRLScene || needEvalScenes || needDataScene)
             {
                 mainGame = SceneManager.GetSceneByPath(MainGamePath);
                 if (!mainGame.isLoaded)
@@ -130,10 +134,11 @@ public static class ArenaAssetBuilder
             if (needArena)
                 BuildArenaPrefab(sourceBase, square, wave, preview, log);
             EnsureRLArenaVariant(preview, log);
+            EnsureV2ArenaVariant(preview, log);
 
             // 全局光先复制到预览场景：新建场景会关闭 MainGame
             Component lightTemplate = null;
-            if ((needScene || needRLScene || needEvalScenes) && sourceLight != null)
+            if ((needScene || needRLScene || needEvalScenes || needDataScene) && sourceLight != null)
             {
                 var holder = new GameObject("Light Template");
                 SceneManager.MoveGameObjectToScene(holder, preview);
@@ -155,7 +160,11 @@ public static class ArenaAssetBuilder
                     BuildScene(EvalBaselineScenePath, ArenaPath, evalPersonas, null, lightTemplate, log, evaluation: true);
                 if (!File.Exists(EvalRLScenePath))
                     BuildScene(EvalRLScenePath, ArenaRLPath, evalPersonas, null, lightTemplate, log, evaluation: true);
+                if (!File.Exists(EvalV2ScenePath))
+                    BuildScene(EvalV2ScenePath, ArenaV2Path, evalPersonas, null, lightTemplate, log, evaluation: true);
             }
+            if (needDataScene)
+                BuildScene(DataScenePath, ArenaPath, null, TrainingPool(personas), lightTemplate, log, dataCollection: true);
             if (needScene)
                 BuildScene(ScenePath, ArenaPath, personas, null, lightTemplate, log);
             else
@@ -520,8 +529,36 @@ public static class ArenaAssetBuilder
                 $"观察 {RLCommander.ObservationSize}，动作 [{string.Join(", ", CommanderActions.BranchSizes(RLCommander.ExpectedZoneCount))}]，每回合 {TrainingWavesPerEpisode} 波）");
     }
 
+    /// <summary>
+    /// V2 训练场：Arena 的变体，指挥官 = PredictiveCommander（默认统计预测器），每回合 4 波（与评估一致）
+    /// </summary>
+    private static void EnsureV2ArenaVariant(Scene preview, List<string> log)
+    {
+        if (File.Exists(ArenaV2Path))
+            return;
+
+        var source = AssetDatabase.LoadAssetAtPath<GameObject>(ArenaPath);
+        var instance = (GameObject)PrefabUtility.InstantiatePrefab(source, preview);
+        GameObject director = instance.GetComponentInChildren<HordeEventSpawner>(true).gameObject;
+
+        var commander = director.AddComponent<PredictiveCommander>();
+        SetProperties(director.GetComponent<HordeEventSpawner>(), ("commanderComponent", commander));
+
+        var arena = new SerializedObject(instance.GetComponent<ArenaEnvironment>());
+        arena.FindProperty("wavesPerEpisode").intValue = TrainingWavesPerEpisode;
+        arena.ApplyModifiedPropertiesWithoutUndo();
+
+        instance.name = "Arena_V2";
+        PrefabUtility.SaveAsPrefabAsset(instance, ArenaV2Path);
+        Object.DestroyImmediate(instance);
+        log.Add($"创建 {ArenaV2Path}（Arena 的变体：指挥官 = PredictiveCommander（统计预测器），每回合 {TrainingWavesPerEpisode} 波）");
+    }
+
+    /// <param name="evaluation">评估场景：固定性格、4 波、锁步 0.02 秒、完整遥测</param>
+    /// <param name="dataCollection">数据场景（V2 预测器的训练数据）：性格池（全部等级）、打乱路线、基准指挥官、4 波、锁步、只写事件</param>
     private static void BuildScene(string scenePath, string arenaPrefabPath, List<string> personas,
-        List<(string path, int minLevel)> pool, Component lightTemplate, List<string> log, bool evaluation = false)
+        List<(string path, int minLevel)> pool, Component lightTemplate, List<string> log, bool evaluation = false,
+        bool dataCollection = false)
     {
         Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
@@ -574,6 +611,14 @@ public static class ArenaAssetBuilder
             serializedManager.FindProperty("telemetry").enumValueIndex = (int)ArenaTelemetry.Off;
             serializedManager.FindProperty("timeScale").floatValue = 0f;
         }
+        if (dataCollection)
+        {
+            // 数据收集：打乱路线（和训练一样，预测器必须读画像才能猜对），只写事件（含 escape_start 的特征向量），锁步运行
+            serializedManager.FindProperty("wavesPerEpisode").intValue = TrainingWavesPerEpisode;
+            serializedManager.FindProperty("timeScale").floatValue = 8f;
+            serializedManager.FindProperty("lockstepFrameTime").floatValue = 0.02f;
+            serializedManager.FindProperty("telemetry").enumValueIndex = (int)ArenaTelemetry.EventsOnly;
+        }
         if (evaluation)
         {
             // 评估：两种指挥官使用相同的性格、种子和回合结构（4 波），完整遥测
@@ -585,7 +630,8 @@ public static class ArenaAssetBuilder
         serializedManager.ApplyModifiedPropertiesWithoutUndo();
 
         EditorSceneManager.SaveScene(scene, scenePath);
-        log.Add(evaluation ? $"创建 {scenePath}（评估：{string.Join(", ", personas.Select(Path.GetFileNameWithoutExtension))}；每回合 {TrainingWavesPerEpisode} 波，完整遥测）" :
+        log.Add(dataCollection ? $"创建 {scenePath}（数据收集：基准指挥官，性格池 {pool.Count} 种（全部等级），打乱路线，每回合 {TrainingWavesPerEpisode} 波，只写事件）" :
+            evaluation ? $"创建 {scenePath}（评估：{string.Join(", ", personas.Select(Path.GetFileNameWithoutExtension))}；每回合 {TrainingWavesPerEpisode} 波，完整遥测）" :
             pool != null
             ? $"创建 {scenePath}（训练：Arena_RL × 8，性格池 {pool.Count} 种按课程等级抽取，打乱路线，不写遥测；未加入 Build Settings）"
             : $"创建 {scenePath}（ArenaManager：8 个训练场，性格 {personas.Count} 种轮流分配；未加入 Build Settings）");
@@ -675,6 +721,7 @@ public static class ArenaAssetBuilder
 
     private const string MenuBaseline = "Tools/Enemy AI/Game Commander: Baseline";
     private const string MenuRL = "Tools/Enemy AI/Game Commander: RL";
+    private const string MenuV2 = "Tools/Enemy AI/Game Commander: V2 (Predictive)";
 
     [MenuItem(MenuBaseline, false, 100)]
     private static void UseBaselineInGame()
@@ -688,14 +735,22 @@ public static class ArenaAssetBuilder
         SetGameCommander(EnemyAISettings.CommanderChoice.RL);
     }
 
+    [MenuItem(MenuV2, false, 102)]
+    private static void UseV2InGame()
+    {
+        SetGameCommander(EnemyAISettings.CommanderChoice.Predictive);
+    }
+
     [MenuItem(MenuBaseline, true)]
     [MenuItem(MenuRL, true)]
+    [MenuItem(MenuV2, true)]
     private static bool ValidateGameCommanderMenu()
     {
         EnemyAISettings settings = AssetDatabase.LoadAssetAtPath<EnemyAISettings>(SettingsPath);
         var choice = settings != null ? settings.gameCommander : EnemyAISettings.CommanderChoice.Baseline;
         Menu.SetChecked(MenuBaseline, choice == EnemyAISettings.CommanderChoice.Baseline);
         Menu.SetChecked(MenuRL, choice == EnemyAISettings.CommanderChoice.RL);
+        Menu.SetChecked(MenuV2, choice == EnemyAISettings.CommanderChoice.Predictive);
         return true;
     }
 
