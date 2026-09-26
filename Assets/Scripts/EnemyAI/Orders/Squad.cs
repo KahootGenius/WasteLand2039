@@ -69,8 +69,8 @@ public class Squad
         Remove(enemy);
     }
 
-    // 防御：成员可能未经 OnDeath 直接被销毁（例如 ForceDestroy / 场景卸载）
-    private void PruneDestroyed()
+    /// <summary>移除已被销毁的成员（成员可能未经 OnDeath 直接被销毁，例如 ForceDestroy / 场景卸载）</summary>
+    public void PruneDestroyed()
     {
         members.RemoveAll(m => m == null);
     }
