@@ -30,11 +30,12 @@ public class InventoryManager : MonoBehaviour
     
     private void Awake()
     {
-        // 单例模式
+        // 单例模式。随 MainGame 场景创建和销毁，不用 DontDestroyOnLoad：
+        // 背包 UI、玩家都在场景里，跨场景保留会让这些引用失效；背包也不存档，
+        // 所以每次进入 MainGame 都是新的一局（新背包 + 新手物资）
         if (Instance == null)
         {
             Instance = this;
-            DontDestroyOnLoad(gameObject);
         }
         else
         {
@@ -51,6 +52,14 @@ public class InventoryManager : MonoBehaviour
             itemTypeColors = Resources.Load<ItemTypeColors>("ItemTypeColors");
         if (playerController == null)
             playerController = FindObjectOfType<PlayerController>();
+    }
+    
+    private void OnDestroy()
+    {
+        if (Instance == this)
+        {
+            Instance = null;
+        }
     }
     
     private void Start()

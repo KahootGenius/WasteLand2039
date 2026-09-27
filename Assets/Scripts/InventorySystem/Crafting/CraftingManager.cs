@@ -19,11 +19,11 @@ public class CraftingManager : MonoBehaviour
     
     private void Awake()
     {
-        // 单例模式
+        // 单例模式。随 MainGame 场景创建和销毁，不用 DontDestroyOnLoad：
+        // 合成 UI 在场景里，跨场景保留会让引用失效（配方的解锁状态在 CraftingRecipe 资源上，不受影响）
         if (Instance == null)
         {
             Instance = this;
-            DontDestroyOnLoad(gameObject);
         }
         else
         {
@@ -34,6 +34,14 @@ public class CraftingManager : MonoBehaviour
         // 自动查找组件
         if (craftingUI == null)
             craftingUI = FindObjectOfType<CraftingUI>();
+    }
+    
+    private void OnDestroy()
+    {
+        if (Instance == this)
+        {
+            Instance = null;
+        }
     }
     
     private void Start()
