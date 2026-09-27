@@ -22,16 +22,24 @@ public class PrerequisiteManager : MonoBehaviour
     
     private void Awake()
     {
-        // 单例模式
+        // 单例模式。随 MainGame 场景创建和销毁，不用 DontDestroyOnLoad：
+        // 条件（对话完成、刷怪开启等）属于一局游戏，新的一局从默认条件开始
         if (Instance == null)
         {
             Instance = this;
-            DontDestroyOnLoad(gameObject);
             InitializeConditions();
         }
         else
         {
             Destroy(gameObject);
+        }
+    }
+    
+    private void OnDestroy()
+    {
+        if (Instance == this)
+        {
+            Instance = null;
         }
     }
     

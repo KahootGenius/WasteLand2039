@@ -23,11 +23,11 @@ public class GameManager : MonoBehaviour
     
     private void Awake()
     {
-        // 单例模式
+        // 单例模式。随 MainGame 场景创建和销毁，不用 DontDestroyOnLoad：
+        // 指引目标 NPC 等引用在场景里；每次进入 MainGame 都是新的一局，重新初始化
         if (instance == null)
         {
             instance = this;
-            DontDestroyOnLoad(gameObject);
             InitializeGame();
         }
         else
@@ -397,6 +397,11 @@ public class GameManager : MonoBehaviour
     
     private void OnDestroy()
     {
+        if (instance == this)
+        {
+            instance = null;
+        }
+        
         // 取消订阅事件
         if (GameDataManager.Instance != null)
         {
