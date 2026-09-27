@@ -35,11 +35,11 @@ public class PauseManager : MonoBehaviour
     
     private void Awake()
     {
-        // 单例模式
+        // 单例模式。随 MainGame 场景创建和销毁，不用 DontDestroyOnLoad：
+        // 暂停菜单在场景里，跨场景保留后引用失效，回到主菜单按 ESC 也会把时间冻结
         if (instance == null)
         {
             instance = this;
-            DontDestroyOnLoad(gameObject);
         }
         else
         {
@@ -325,6 +325,16 @@ public class PauseManager : MonoBehaviour
     
     private void OnDestroy()
     {
+        if (instance == this)
+        {
+            // 暂停中离开场景时恢复时间缩放，避免下一个场景被冻结
+            if (isPaused)
+            {
+                Time.timeScale = originalTimeScale;
+            }
+            instance = null;
+        }
+        
         // 清理按钮事件
         if (continueButton != null)
         {

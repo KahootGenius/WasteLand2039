@@ -36,11 +36,11 @@ public class TutorialGuideManager : MonoBehaviour
     
     private void Awake()
     {
-        // 单例模式
+        // 单例模式。随 MainGame 场景销毁（由 GameManager 在场景中创建），不用 DontDestroyOnLoad：
+        // 场景灯光和目标 NPC 的引用在场景里，新的一局重新播放指引
         if (instance == null)
         {
             instance = this;
-            DontDestroyOnLoad(gameObject);
         }
         else
         {
@@ -338,6 +338,11 @@ public class TutorialGuideManager : MonoBehaviour
     
     private void OnDestroy()
     {
+        if (instance == this)
+        {
+            instance = null;
+        }
+        
         // 清理资源
         if (tutorialSpotlight != null)
         {
