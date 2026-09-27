@@ -1,6 +1,6 @@
-# Review: `MLTraining/adaptive_horde_plan.md` (Adaptive Horde)
+# Review: `adaptive_horde_plan.md` (Adaptive Horde)
 
-2026-09-27. The plan is the user's (untracked, not committed). This review checks it against the game's code and against what the V2 experiment (Phase 5) already built and measured.
+2026-09-27. The plan is the user's (reviewed while it sat untracked in `MLTraining/`; since moved out of the repo). This review checks it against the game's code and against what the V2 experiment (Phase 5) already built and measured.
 
 ## Verdict
 
