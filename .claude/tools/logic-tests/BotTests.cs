@@ -82,6 +82,11 @@ static partial class LogicTests
 
         Console.WriteLine("Checks: Adaptive vs RunnerA when route A is ambushed");
         Check(runnerAmbushed.Ambushes >= 2, "ambushes happen on A", $"= {runnerAmbushed.Ambushes}");
+        var causes = runnerAmbushed.AmbushCauses.Concat(adaptiveAmbushed.AmbushCauses).ToList();
+        Check(causes.Count > 0 && causes.All(c => (c.cause == AmbushCause.Damage) == (c.index < 0)) &&
+              causes.Any(c => c.cause != AmbushCause.Damage),
+            "each ambush records its cause, and the zombie for 'ahead' / 'at the refuge'",
+            "(" + string.Join(", ", causes.GroupBy(c => c.cause).Select(g => $"{g.Key} {g.Count()}")) + ")");
         Check(runnerAmbushed.Decisions.All(d => d.RouteName == "A"), "RunnerA keeps using A (no adaptation)");
         var adaptiveFlees = adaptiveAmbushed.Decisions.Where(d => d.Mode == BotMode.Flee).ToList();
         var laterHalf = adaptiveFlees.Skip(adaptiveFlees.Count / 2).ToList();
@@ -194,6 +199,7 @@ static partial class LogicTests
         public readonly List<BotDecision> Decisions = new List<BotDecision>();
         public readonly List<EscapeEpisode> Escapes = new List<EscapeEpisode>();
         public int Kills, Deaths, Ambushes, ValidEscapes;
+        public readonly List<(AmbushCause cause, int index)> AmbushCauses = new List<(AmbushCause, int)>();
         public float MinWeightA = 1f;
         /// <summary>engaged seconds by (what the bot was doing, what the tracker labeled it)</summary>
         public readonly Dictionary<(BotMode, EngagementState), float> LabelByMode = new Dictionary<(BotMode, EngagementState), float>();
@@ -224,7 +230,12 @@ static partial class LogicTests
 
             Brain = new BotBrain(spec.Sample(rng), Layout, new System.Random(seed * 31 + 7));
             Brain.Decided += Decisions.Add;
-            Brain.Ambushed += _ => { Ambushes++; MinWeightA = Math.Min(MinWeightA, Brain.RouteWeights[0]); };
+            Brain.Ambushed += _ =>
+            {
+                Ambushes++;
+                MinWeightA = Math.Min(MinWeightA, Brain.RouteWeights[0]);
+                AmbushCauses.Add((Brain.LastAmbushCause, Brain.LastAmbushEnemyIndex));
+            };
         }
 
         public void RunWaves(int waves)

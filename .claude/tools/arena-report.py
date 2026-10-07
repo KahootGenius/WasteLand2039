@@ -28,6 +28,11 @@ Per bot flee decision (ground truth route; the escape_start within 2 s supplies 
   ambushed         the bot's own check fired on that flee: after 1 s it took damage or met a zombie
                    within 4 units ahead on its route (`bot_ambushed`); also split by wave in the episode
                    (the profile resets every episode, so a learning commander should improve over it)
+  by an ambusher   ground truth (telemetry with `by_ambusher`): the zombie behind that ambush was holding
+                   (HoldAt, a commander's ambush squad) rather than chasing / roaming; on damage it is the
+                   nearest zombie within 2.5 units. Share of all flees, so it adds up to the ambushed rate
+                   together with the ambushes by chasers; the cause row says which check fired (damage,
+                   a zombie ahead on the route, a zombie already at the refuge)
   route predicted  plan §4 test: the route sector holding the most zombies (unique max) is the route
                    the bot takes; only decisions made outside all route sectors with some route
                    occupied count; chance = 1/3
@@ -56,6 +61,7 @@ FLEE_ONSET_WINDOW = 2.0
 ROUTE_SECTOR = {"A": "E", "B": "NW", "C": "SW"}
 SECTOR_ROUTE = {v: k for k, v in ROUTE_SECTOR.items()}
 STATES = ["Fight", "Flee", "Kite", "Passive"]
+CAUSES = ["Damage", "AheadOnRoute", "AtRefuge"]  # BotBrain.AmbushCause
 
 
 # ---------------------------------------------------------------- loading
@@ -181,6 +187,10 @@ def summarize(path):
     # flee decisions: enemy positions at onset (next escape_start) and whether the bot was ambushed
     flees = []
     wave_in_episode = 0
+    # the ground truth is known when the session's ambush events carry it (or there were none: then no flee
+    # was ambushed, by an ambusher or otherwise); older telemetry: None for every flee, so it isn't pooled
+    ambush_events = [e for e in events if e["type"] == "bot_ambushed"]
+    has_truth = all("by_ambusher" in e for e in ambush_events)
     for i, d in enumerate(events):
         if d["type"] == "episode_start":
             wave_in_episode = 0
@@ -189,6 +199,7 @@ def summarize(path):
         if d["type"] != "bot_decision" or d.get("mode") != "Flee" or d.get("route") not in ROUTE_SECTOR:
             continue
         onset, ambushed, prediction = None, False, None
+        by_ambusher, cause = False, None
         for g in events[i + 1:]:
             if g["type"] in ("bot_decision", "episode_start"):
                 break
@@ -199,6 +210,8 @@ def summarize(path):
                 prediction = g
             if g["type"] == "bot_ambushed" and g.get("route") == d["route"]:
                 ambushed = True
+                by_ambusher = by_ambusher or bool(g.get("by_ambusher"))
+                cause = cause or g.get("cause")
         if onset is None:
             continue
         route_sector = ROUTE_SECTOR[d["route"]]
@@ -209,6 +222,8 @@ def summarize(path):
             "route": d["route"],
             "wave": wave_in_episode,
             "ambushed": ambushed,
+            "by_ambusher": by_ambusher if has_truth else None,
+            "cause": cause,  # Damage / AheadOnRoute / AtRefuge (None: not ambushed, or older telemetry)
             "on_route": counts[d["route"]] > 0 if bot_sector != route_sector else None,
             # top-1 prediction: the route sector with the most zombies is the one the bot takes
             # (only when the bot is outside all route sectors and some route has zombies; chance 1/3)
@@ -276,6 +291,7 @@ def flee_stats(flees):
     known = [f for f in flees if f["on_route"] is not None]
     guessed = [f for f in flees if f["predicted"] is not None]
     planned = [f for f in flees if f.get("ambush_on_route") is not None]
+    truth = [f for f in flees if f.get("by_ambusher") is not None]
     return {
         "ambush_n": len(planned),
         "ambush_on_route": sum(f["ambush_on_route"] for f in planned),
@@ -285,6 +301,10 @@ def flee_stats(flees):
         "on_route": sum(f["on_route"] for f in known),
         "predicted_n": len(guessed),
         "predicted": sum(f["predicted"] for f in guessed),
+        "truth_n": len(truth),
+        "by_ambusher": sum(f["by_ambusher"] for f in truth),
+        "by_chaser": sum(f["ambushed"] and not f["by_ambusher"] for f in truth),
+        "causes": Counter(f["cause"] for f in truth if f["cause"]),
     }
 
 
@@ -397,6 +417,17 @@ def compare(a, b, markdown):
                 [persona, "flee: ambushed", fmt_prop(fa["ambushed"], fa["n"]), fmt_prop(fb["ambushed"], fb["n"])],
                 [persona, "flee: ambushed by wave in episode", ambush_by_wave([f for r in ra for f in r["flees"]]),
                  ambush_by_wave([f for r in rb for f in r["flees"]])],
+            ]
+            if fa["truth_n"] or fb["truth_n"]:
+                lines += [
+                    [persona, "flee: ambushed by an ambusher (holding)", fmt_prop(fa["by_ambusher"], fa["truth_n"]),
+                     fmt_prop(fb["by_ambusher"], fb["truth_n"])],
+                    [persona, "flee: ambushed by a chaser", fmt_prop(fa["by_chaser"], fa["truth_n"]),
+                     fmt_prop(fb["by_chaser"], fb["truth_n"])],
+                    [persona, "flee: ambush cause", fmt_counter(fa["causes"], CAUSES) or "-",
+                     fmt_counter(fb["causes"], CAUSES) or "-"],
+                ]
+            lines += [
                 [persona, "flee: route predicted (top-1, chance 33%)", fmt_prop(fa["predicted"], fa["predicted_n"]),
                  fmt_prop(fb["predicted"], fb["predicted_n"])],
             ]

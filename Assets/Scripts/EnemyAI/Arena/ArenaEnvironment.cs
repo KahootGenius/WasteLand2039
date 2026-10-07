@@ -352,10 +352,17 @@ public class ArenaEnvironment : MonoBehaviour
         if (monitor == null || bot == null || bot.Brain == null)
             return;
         var weights = new List<float>(bot.Brain.RouteWeights);
+        // 地面真值：是谁拦截的。驻守中的敌人（HoldAt，指挥官的伏击小队）= 伏击者；其他 = 追兵 / 自主行动的敌人。
+        // 受到伤害时取离玩家最近的敌人作为可能的攻击者（PlayerBot.LastAmbushEnemy）
+        Enemy enemy = bot.LastAmbushEnemy;
+        EnemyOrderType order = enemy != null ? enemy.CurrentOrder.Type : EnemyOrderType.None;
         monitor.LogEvent("bot_ambushed")
             .Add("episode", Episode)
             .Add("route", bot.Brain.RouteName(route))
             .Add("route_weights", weights)
+            .Add("cause", bot.Brain.LastAmbushCause.ToString())
+            .Add("enemy_order", enemy != null ? order.ToString() : "")
+            .Add("by_ambusher", enemy != null && order == EnemyOrderType.HoldAt)
             .Write();
     }
 

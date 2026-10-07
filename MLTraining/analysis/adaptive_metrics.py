@@ -12,6 +12,9 @@ Per persona and variant:
   trials                     valid escapes the commander recorded (`ambush_trial`, one per valid escape)
   ambush on route (onset)    a site with a member in the bot's chosen route sector at flee onset (arena-report)
   bot ambushed               the bot's own check (`bot_ambushed`: zombie within 4 ahead or damage), as in arena-report
+  … by an ambusher / chaser  ground truth (since 2026-10-07): the zombie behind it was holding (HoldAt, an ambush squad)
+                             or not; both are shares of all flee decisions, so they add up to "bot ambushed"
+  ambush cause               which check fired: damage / a zombie ahead on the route / a zombie already at the refuge
   contact on the ran route   a site in the sector the player actually ran to had a member within the contact radius,
                              1 s or more after flee onset (what the bandit learns from; the radius is in the batch:
                              2.5 before 2026-10-07, 6 since)
@@ -187,10 +190,18 @@ def fmt_by_wave(by_wave):
     return " ".join(f"w{w} {ar.pct(k / n)}" for w, (k, n) in sorted(by_wave.items()) if n and w > 0) or "-"
 
 
+FLEE_COUNT = {"ambush_on_route": "ambush_n", "by_ambusher": "truth_n", "by_chaser": "truth_n"}
+
+
 def flee(reports, key):
     f = ar.flee_stats([x for s in reports for x in s["flees"]])
-    count_key = "ambush_n" if key == "ambush_on_route" else "n"
+    count_key = FLEE_COUNT.get(key, "n")
     return ar.fmt_prop(f[key], f[count_key]) if f[count_key] else "-"
+
+
+def causes(reports):
+    f = ar.flee_stats([x for s in reports for x in s["flees"]])
+    return ar.fmt_counter(f["causes"], ar.CAUSES) or "-"
 
 
 def damage(reports):
@@ -232,6 +243,9 @@ def main(argv):
         row("trials (valid escapes)", lambda d, r: str(d["trials"]) if d else "-")
         row("ambush on route at flee onset", lambda d, r: flee(r, "ambush_on_route"))
         row("bot ambushed (flee decisions)", lambda d, r: flee(r, "ambushed"))
+        row("… by an ambusher (holding)", lambda d, r: flee(r, "by_ambusher"))
+        row("… by a chaser", lambda d, r: flee(r, "by_chaser"))
+        row("ambush cause (damage / ahead / at refuge)", lambda d, r: causes(r))
         row("contact radius", lambda d, r: "/".join(f"{x:g}" for x in sorted(d["radius"])) if d and d["radius"] else "-")
         row("contact on the ran route", lambda d, r: ar.fmt_prop(d["on_route"], d["trials"]) if d else "-")
         row("closest on-route ambusher ≤2.5/–4/–6/–10/>10/never",
@@ -258,6 +272,7 @@ def main(argv):
             for metric, fn in [
                 ("ambush on route at flee onset", lambda d, r: flee(r, "ambush_on_route")),
                 ("bot ambushed", lambda d, r: flee(r, "ambushed")),
+                ("bot ambushed by an ambusher", lambda d, r: flee(r, "by_ambusher")),
                 ("contact on the ran route", lambda d, r: ar.fmt_prop(d["on_route"], d["trials"]) if d else "-"),
             ]:
                 cells = []

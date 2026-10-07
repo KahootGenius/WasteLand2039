@@ -19,6 +19,17 @@ public enum BotMode
     Return
 }
 
+/// <summary>逃跑途中被拦截的原因（BotBrain.LastAmbushCause）</summary>
+public enum AmbushCause
+{
+    /// <summary>受到伤害</summary>
+    Damage,
+    /// <summary>路线前方近处出现敌人</summary>
+    AheadOnRoute,
+    /// <summary>到达避难点时附近已有敌人</summary>
+    AtRefuge
+}
+
 /// <summary>机器人每一步看到的信息（与真人从屏幕上能得到的信息相当）</summary>
 public struct BotObservation
 {
@@ -110,6 +121,10 @@ public class BotBrain
     public float NearestEnemyDistance { get; private set; } = float.PositiveInfinity;
     public int Decisions { get; private set; }
     public int Ambushes { get; private set; }
+    /// <summary>最近一次被拦截的原因（Ambushed 触发时有效）</summary>
+    public AmbushCause LastAmbushCause { get; private set; }
+    /// <summary>最近一次被拦截时触发它的敌人在本步观测 Enemies 中的下标；受到伤害时为 -1（不知道是谁）</summary>
+    public int LastAmbushEnemyIndex { get; private set; } = -1;
 
     /// <summary>做出一次交战决定</summary>
     public event Action<BotDecision> Decided;
@@ -392,7 +407,11 @@ public class BotBrain
         if (time - escapeStartTime <= AmbushGraceSeconds)
             return false;
         if (damaged)
+        {
+            LastAmbushCause = AmbushCause.Damage;
+            LastAmbushEnemyIndex = -1;
             return true;
+        }
         if (Route < 0 || o.Enemies == null)
             return false;
 
@@ -404,7 +423,11 @@ public class BotBrain
             Vector2 toEnemy = o.Enemies[i] - o.Position;
             if (arrived ? Vector2.Distance(o.Enemies[i], refuge) <= Params.DecisionDistance
                         : toEnemy.magnitude <= AmbushDistance && Vector2.Dot(toEnemy, toRefuge) > 0f)
+            {
+                LastAmbushCause = arrived ? AmbushCause.AtRefuge : AmbushCause.AheadOnRoute;
+                LastAmbushEnemyIndex = i;
                 return true;
+            }
         }
         return false;
     }

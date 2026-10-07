@@ -24,6 +24,15 @@ public class PlayerBot : MonoBehaviour, IPlayerInput
     private bool pendingFire;
     private bool pendingReload;
     private readonly List<Vector2> enemyPositions = new List<Vector2>();
+    /// <summary>与 enemyPositions 一一对应的敌人（被拦截时找出是哪个敌人）</summary>
+    private readonly List<Enemy> observedEnemies = new List<Enemy>();
+    private const float ProbableAttackerRadius = 2.5f;
+
+    /// <summary>
+    /// 最近一次被拦截时触发它的敌人（Ambushed 触发时有效）。受到伤害时不知道是谁打的，取离玩家
+    /// ProbableAttackerRadius 以内最近的敌人（可能的攻击者），没有则为 null
+    /// </summary>
+    public Enemy LastAmbushEnemy { get; private set; }
 
     public BotBrain Brain => brain;
 
@@ -120,6 +129,7 @@ public class PlayerBot : MonoBehaviour, IPlayerInput
         }
 
         enemyPositions.Clear();
+        observedEnemies.Clear();
         IReadOnlyList<GameObject> spawned = enemySource != null && enemySource.Context != null
             ? enemySource.Context.ActiveEnemies
             : null;
@@ -129,7 +139,10 @@ public class PlayerBot : MonoBehaviour, IPlayerInput
             {
                 Enemy enemy = spawned[i] != null ? spawned[i].GetComponent<Enemy>() : null;
                 if (enemy != null && !enemy.IsDead && enemy.IsMovingEnemy())
+                {
                     enemyPositions.Add(enemy.transform.position);
+                    observedEnemies.Add(enemy);
+                }
             }
         }
 
@@ -161,7 +174,26 @@ public class PlayerBot : MonoBehaviour, IPlayerInput
 
     private void ForwardAmbushed(int route)
     {
+        int index = brain.LastAmbushEnemyIndex;
+        LastAmbushEnemy = index >= 0 && index < observedEnemies.Count ? observedEnemies[index] : ProbableAttacker();
         Ambushed?.Invoke(route);
+    }
+
+    private Enemy ProbableAttacker()
+    {
+        Enemy nearest = null;
+        float best = ProbableAttackerRadius;
+        Vector2 position = transform.position;
+        for (int i = 0; i < observedEnemies.Count; i++)
+        {
+            float distance = Vector2.Distance(enemyPositions[i], position);
+            if (observedEnemies[i] != null && distance <= best)
+            {
+                best = distance;
+                nearest = observedEnemies[i];
+            }
+        }
+        return nearest;
     }
 
     private void OnDrawGizmos()
