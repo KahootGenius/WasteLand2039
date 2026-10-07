@@ -30,6 +30,7 @@ static partial class LogicTests
         CommanderLearningTests();
         ProfilePersistenceTests();
         PredictionTests();
+        BanditTests();
 
         Console.WriteLine();
         Console.WriteLine(failures == 0 ? "ALL PASSED" : $"{failures} FAILED");
