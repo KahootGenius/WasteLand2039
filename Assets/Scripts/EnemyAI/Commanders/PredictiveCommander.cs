@@ -29,18 +29,21 @@ using UnityEngine;
 ///   minEvidence 门槛在所有模式下都保留；minProbability / switchMargin 只用于 Argmax。
 /// - 试验（逃跑开始时记录各伏击点）：起跑 contactGraceSeconds 秒后，伏击小队任一成员离玩家 ≤ contactRadius 即为接触。
 ///   默认 6 = holdEngageRadius（玩家跑进伏击、伏击者被触发）；第一次评估用的 2.5（= 监测组件的 intercepted）
-///   逃跑的机器人几乎从不进入，奖励全是 0。逃跑结束时只更新玩家实际逃跑方向扇区里的伏击点（其他扇区没有被试验）。
+///   逃跑的机器人几乎从不进入，奖励全是 0。逃跑结束后再观察 contactTailSeconds 秒（-v2ContactTail）：逃跑常在玩家甩开追兵
+///   （GotAway）或看到前方的敌人（Stopped）时就结束，这时玩家多半还在跑向避难点的伏击者。观察结束（或新的逃跑开始、
+///   波次结束）时结算：只更新玩家实际逃跑方向扇区里的伏击点（其他扇区没有被试验）。采样模式在结算之后才重新选择，
+///   观察期间伏击点留在原地；新的逃跑提前结束了观察时，等那次逃跑结束再选择。V2 照常在逃跑结束时重新预测（决策不变）。
 /// - 训练场：每回合开始时老虎机回到先验（resetBanditEachEpisode，可关闭以跨回合保留）。
 /// - 跨会话保存（Bandit 模式，且玩家画像也跨会话保存时）：第一波开始时读取 AmbushBanditStore，
 ///   每波结束、游戏暂停和退出时写入。游戏场景用 EnemyAISettings.v2Thompson / v2Bandit 选择模式（EnemyAIBootstrap）。
 ///
 /// 遥测（经 PlayerBehaviourMonitor）：commander_order（与 RLCommander 格式相同），每次逃跑开始时的 prediction，
-/// 每次有效逃跑结束时的 ambush_trial（伏击 / 压迫小队是否接触，所有模式），老虎机每次更新的 bandit_update。
+/// 每次有效逃跑结算时（结束后的观察期满）的 ambush_trial（伏击 / 压迫小队是否接触，所有模式），老虎机每次更新的 bandit_update。
 ///
 /// 命令行（独立运行的评估程序，覆盖 Inspector 设置）：
 ///   -v2Predictor Frequency|Learned   -v2From Base|PlayerZone   -v2React
 ///   -v2Thompson   -v2Bandit   -v2BanditShared   -v2BanditKeep（不按回合重置）   -v2Gamma 0.9   -v2Seed N
-///   -v2ContactRadius 6   -v2BanditJoint   -v2RedrawEveryEscape
+///   -v2ContactRadius 6   -v2ContactTail 5   -v2BanditJoint   -v2RedrawEveryEscape
 /// </summary>
 public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisodeListener
 {
@@ -147,6 +150,9 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
     [SerializeField] private float contactRadius = 6f;
     [Tooltip("与 PlayerBehaviourMonitor.interceptGraceSeconds 一致")]
     [SerializeField] private float contactGraceSeconds = 1f;
+    [Tooltip("逃跑结束后继续观察接触的时间（秒）：逃跑常在玩家还没跑到伏击点时就结束（甩开追兵 / 看到前方的敌人）。" +
+             "默认 5 ≈ 从基地全速跑到训练场的避难点（26 / 5）。0 = 只看逃跑本身（第二次评估）")]
+    [SerializeField] private float contactTailSeconds = 5f;
 
     public string DisplayName
     {
@@ -166,6 +172,8 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
                     name += "-joint";
                 if (Mathf.Abs(contactRadius - 6f) > 1e-4f)
                     name += "-r" + contactRadius.ToString("0.##", CultureInfo.InvariantCulture);
+                if (Mathf.Abs(contactTailSeconds - 5f) > 1e-4f)
+                    name += "-tail" + contactTailSeconds.ToString("0.##", CultureInfo.InvariantCulture);
                 if (redrawDistanceEveryEscape)
                     name += "-every";
             }
@@ -202,7 +210,10 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
         public int DistanceIndex;
         public int Zone;
         public float Distance;
+        /// <summary>逃跑期间加上结束后的观察期内，成员离玩家最近的距离（老虎机的奖励）</summary>
         public float MinDistance = float.PositiveInfinity;
+        /// <summary>只算逃跑期间（第二次评估的奖励，遥测对照用）</summary>
+        public float EscapeMinDistance = float.PositiveInfinity;
     }
 
     private class Trial
@@ -211,11 +222,16 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
         public float StartTime;
         public readonly List<TrialSite> Sites = new List<TrialSite>();
         public float PressureMinDistance = float.PositiveInfinity;
+        public float PressureEscapeMinDistance = float.PositiveInfinity;
         /// <summary>reactToFlee 在起跑时把伏击挪走了：测到的不是"等待"，不更新老虎机</summary>
         public bool Reacted;
+        /// <summary>逃跑结束后（有效试验）：结束的逃跑、结束时间、观察到何时</summary>
+        public EscapeEpisode Escape;
+        public float EndTime;
+        public float TailEnd;
     }
 
-    /// <summary>一次有效试验的结果（逃跑结束时计算）</summary>
+    /// <summary>一次有效试验的结果（结算时计算）</summary>
     private class TrialOutcome
     {
         public Trial Trial;
@@ -226,6 +242,10 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
         public bool TestedContact;
         public bool PressureContact;
         public float OnRouteMinDistance = float.PositiveInfinity;
+        /// <summary>只算逃跑期间（对照）</summary>
+        public bool TestedContactInEscape;
+        public bool PressureContactInEscape;
+        public float OnRouteMinDistanceInEscape = float.PositiveInfinity;
         public readonly List<string> SiteLog = new List<string>();
         public readonly List<float> SiteMinDistances = new List<float>();
     }
@@ -249,7 +269,10 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
     private readonly float[] sampledDirections = new float[EscapeSectors.Count];
     private readonly float[] routeBuffer = new float[EscapeSectors.Count];
     private int drawnDirection = -1;
+    /// <summary>进行中的逃跑的试验</summary>
     private Trial trial;
+    /// <summary>逃跑已结束、还在观察接触的试验（contactTailSeconds）</summary>
+    private Trial pendingTrial;
     private bool banditLoadTried;
     private bool banditPersistent;
     private bool banditSaveWarned;
@@ -297,6 +320,8 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
                 samplingSeed = seed;
             else if (args[i] == "-v2ContactRadius" && float.TryParse(next, NumberStyles.Float, CultureInfo.InvariantCulture, out float radius))
                 contactRadius = Mathf.Max(0f, radius);
+            else if (args[i] == "-v2ContactTail" && float.TryParse(next, NumberStyles.Float, CultureInfo.InvariantCulture, out float tail))
+                contactTailSeconds = Mathf.Max(0f, tail);
             else if (args[i] == "-v2BanditJoint")
                 banditChoosesSector = true;
             else if (args[i] == "-v2RedrawEveryEscape")
@@ -367,6 +392,7 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
         confident = false;
         drawnDirection = -1;
         trial = null; // 快照引用的是旧小队
+        pendingTrial = null;
     }
 
     // ---------- IHordeCommander ----------
@@ -428,6 +454,7 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
 
     public void OnWaveCompleted(HordeContext waveContext)
     {
+        ScorePendingTrial(ScoredBy.WaveEnd); // 观察到此为止；下一波开始时重新选择
         Unsubscribe();
         pressure.Issue(EnemyOrder.None);
         foreach (AmbushSite site in sites)
@@ -812,19 +839,47 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
 
     private void HandleEscapeEnded(EscapeEpisode escape)
     {
-        // 先记下这次试验的结果（老虎机更新、伏击点标记为被试过），再按已计入这次逃跑的画像重新选择（所有模式每次逃跑后都选）
-        TrialOutcome outcome = FinishTrial(escape);
-        Replan();
-        if (outcome != null)
-            LogTrial(escape, outcome, true);
+        ScorePendingTrial(ScoredBy.NextEscape); // 正常情况下已在这次逃跑开始时结算
+        Trial ended = EndTrial(escape);
+        if (ended != null && contactTailSeconds > 0f && escape.EndReason != EscapeEndReason.Interrupted)
+        {
+            // 继续观察接触；采样模式结算后才重新选择（老虎机先学到这次的结果），V2 照常立即重新预测
+            ended.TailEnd = Time.time + contactTailSeconds;
+            pendingTrial = ended;
+            if (!UsesSampling)
+                Replan();
+        }
+        else
+        {
+            // 没有要观察的试验（无效的逃跑 / 不观察）：先结算（老虎机更新、伏击点标记为被试过），
+            // 再按已计入这次逃跑的画像重新选择（所有模式每次逃跑后都选）
+            TrialOutcome outcome = ended != null ? ScoreTrial(ended) : null;
+            Replan();
+            if (outcome != null)
+                LogTrial(ended, outcome, true, ScoredBy.EscapeEnd);
+        }
         nextPredictionTime = Time.time + predictionInterval;
     }
 
     // ---------- 试验（接触奖励） ----------
 
-    /// <summary>逃跑开始：记录各伏击点（扇区、距离档、小队）</summary>
+    /// <summary>试验在什么时候结算（遥测 ambush_trial.scored_by）</summary>
+    private enum ScoredBy
+    {
+        /// <summary>逃跑结束时（无观察期）</summary>
+        EscapeEnd,
+        /// <summary>观察期结束</summary>
+        Tail,
+        /// <summary>新的逃跑开始，观察期提前结束</summary>
+        NextEscape,
+        /// <summary>波次结束，观察期提前结束</summary>
+        WaveEnd
+    }
+
+    /// <summary>逃跑开始：上一次的试验若还在观察期就此结算；记录各伏击点（扇区、距离档、小队）</summary>
     private void BeginTrial(EscapeEpisode escape)
     {
+        ScorePendingTrial(ScoredBy.NextEscape);
         trial = null;
         if (context == null || context.Zones == null)
             return;
@@ -847,21 +902,42 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
     }
 
     /// <summary>
-    /// 逃跑途中（起跑 contactGraceSeconds 秒后）记录每个伏击小队、以及压迫小队离玩家最近的距离。
-    /// 成员会死亡、被调走或补充，所以每次都重新读小队成员
+    /// 逃跑途中和结束后的观察期内（起跑 contactGraceSeconds 秒后）记录每个伏击小队、以及压迫小队离玩家最近的距离；
+    /// 观察期满时结算。成员会死亡、被调走或补充，所以每次都重新读小队成员
     /// </summary>
     private void TrackTrial()
     {
-        if (trial == null || context == null || context.Player == null || context.Engagement == null)
+        if (context == null || context.Player == null)
+            return;
+        Vector2 player = context.Player.position;
+        if (pendingTrial != null)
+        {
+            Track(pendingTrial, player, false);
+            if (Time.time >= pendingTrial.TailEnd)
+                ScorePendingTrial(ScoredBy.Tail);
+        }
+        if (trial == null || context.Engagement == null)
             return;
         EscapeEpisode escape = context.Engagement.ActiveEscape;
-        if (escape == null || escape.Id != trial.EscapeId || Time.time - trial.StartTime < contactGraceSeconds)
-            return;
+        if (escape != null && escape.Id == trial.EscapeId)
+            Track(trial, player, true);
+    }
 
-        Vector2 player = context.Player.position;
-        foreach (TrialSite site in trial.Sites)
-            site.MinDistance = Mathf.Min(site.MinDistance, NearestMember(site.Squad, player));
-        trial.PressureMinDistance = Mathf.Min(trial.PressureMinDistance, NearestMember(pressure, player));
+    private void Track(Trial tracked, Vector2 player, bool inEscape)
+    {
+        if (Time.time - tracked.StartTime < contactGraceSeconds)
+            return;
+        foreach (TrialSite site in tracked.Sites)
+        {
+            float distance = NearestMember(site.Squad, player);
+            site.MinDistance = Mathf.Min(site.MinDistance, distance);
+            if (inEscape)
+                site.EscapeMinDistance = Mathf.Min(site.EscapeMinDistance, distance);
+        }
+        float pressureDistance = NearestMember(pressure, player);
+        tracked.PressureMinDistance = Mathf.Min(tracked.PressureMinDistance, pressureDistance);
+        if (inEscape)
+            tracked.PressureEscapeMinDistance = Mathf.Min(tracked.PressureEscapeMinDistance, pressureDistance);
     }
 
     private static float NearestMember(Squad squad, Vector2 player)
@@ -876,24 +952,49 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
         return nearest;
     }
 
-    /// <summary>
-    /// 逃跑结束：与画像相同的过滤（有效、位移 &gt; 1）；只有玩家实际逃跑方向扇区里的伏击点算被试验过，
-    /// Bandit 模式下用"是否接触"更新对应的臂
-    /// </summary>
-    private TrialOutcome FinishTrial(EscapeEpisode escape)
+    /// <summary>逃跑结束：与画像相同的过滤（有效、位移 &gt; 1）。返回要结算的试验，没有则为 null</summary>
+    private Trial EndTrial(EscapeEpisode escape)
     {
-        Trial finished = trial;
+        Trial ended = trial;
         trial = null;
-        if (finished == null || finished.EscapeId != escape.Id)
+        if (ended == null || ended.EscapeId != escape.Id)
             return null;
         if (!escape.IsValid || escape.Displacement.magnitude <= 1f)
             return null;
+        ended.Escape = escape;
+        ended.EndTime = Time.time;
+        return ended;
+    }
 
+    /// <summary>
+    /// 结算观察期中的试验。采样模式只在观察期满时重新选择：新的逃跑开始时不挪动伏击（等那次逃跑结束），
+    /// 波次结束时下一波开始会选择。V2 已在逃跑结束时重新预测过
+    /// </summary>
+    private void ScorePendingTrial(ScoredBy scoredBy)
+    {
+        Trial finished = pendingTrial;
+        pendingTrial = null;
+        if (finished == null)
+            return;
+        TrialOutcome outcome = ScoreTrial(finished);
+        bool redecide = !UsesSampling || scoredBy == ScoredBy.Tail;
+        if (UsesSampling && redecide)
+            Replan();
+        LogTrial(finished, outcome, redecide, scoredBy);
+    }
+
+    /// <summary>
+    /// 结算：只有玩家实际逃跑方向扇区里的伏击点算被试验过，Bandit 模式下用"是否接触"更新对应的臂
+    /// </summary>
+    private TrialOutcome ScoreTrial(Trial finished)
+    {
+        EscapeEpisode escape = finished.Escape;
         var outcome = new TrialOutcome
         {
             Trial = finished,
             RanSector = RadialZoneMap.DirectionToSector(escape.Displacement, EscapeSectors.Count),
-            PressureContact = finished.PressureMinDistance <= contactRadius
+            PressureContact = finished.PressureMinDistance <= contactRadius,
+            PressureContactInEscape = finished.PressureEscapeMinDistance <= contactRadius
         };
         bool learn = placement == Placement.Bandit && !finished.Reacted;
         foreach (TrialSite site in finished.Sites)
@@ -906,6 +1007,8 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
                 outcome.Tested = true;
                 outcome.TestedContact |= contact;
                 outcome.OnRouteMinDistance = Mathf.Min(outcome.OnRouteMinDistance, site.MinDistance);
+                outcome.TestedContactInEscape |= site.EscapeMinDistance <= contactRadius;
+                outcome.OnRouteMinDistanceInEscape = Mathf.Min(outcome.OnRouteMinDistanceInEscape, site.EscapeMinDistance);
             }
             outcome.SiteLog.Add(DescribeTrialSite(site, tested));
             outcome.SiteMinDistances.Add(site.MinDistance);
@@ -993,8 +1096,10 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
 
     public void OnArenaEpisodeStarting(ArenaEnvironment arena)
     {
-        // 画像在此之前已被重置（ArenaEnvironment.BeginEpisode）；方向采样读取画像，自动从头开始
+        // 画像在此之前已被重置（ArenaEnvironment.BeginEpisode）；方向采样读取画像，自动从头开始。
+        // 观察期中的试验已在波次结束时结算
         trial = null;
+        pendingTrial = null;
         if (resetBanditEachEpisode)
             bandit?.Reset();
     }
@@ -1063,11 +1168,12 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
         line.Write();
     }
 
-    /// <summary>每次有效逃跑：各伏击点 / 压迫小队是否接触（所有模式，包括 V2 对照）</summary>
-    private void LogTrial(EscapeEpisode escape, TrialOutcome outcome, bool redecided)
+    /// <summary>每次有效逃跑（结算时）：各伏击点 / 压迫小队是否接触（所有模式，包括 V2 对照）</summary>
+    private void LogTrial(Trial finished, TrialOutcome outcome, bool redecided, ScoredBy scoredBy)
     {
         if (monitor == null || context == null || context.Zones == null)
             return;
+        EscapeEpisode escape = finished.Escape;
         monitor.LogEvent("ambush_trial")
             .Add("escape", escape.Id)
             .Add("ran_sector", PlayerProfile.DirectionName(outcome.RanSector))
@@ -1083,6 +1189,13 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
             .Add("pressure_contact", outcome.PressureContact)
             .Add("pressure_min_distance", outcome.Trial.PressureMinDistance)
             .Add("reacted", outcome.Trial.Reacted)
+            // 观察期：设定的秒数、结束的方式、实际观察了多久；*_in_escape = 只算逃跑期间（第二次评估的奖励）
+            .Add("tail_seconds", contactTailSeconds)
+            .Add("scored_by", scoredBy.ToString())
+            .Add("tracked_after_end", Time.time - finished.EndTime)
+            .Add("ambush_contact_on_route_in_escape", outcome.TestedContactInEscape)
+            .Add("on_route_min_distance_in_escape", outcome.OnRouteMinDistanceInEscape)
+            .Add("pressure_contact_in_escape", outcome.PressureContactInEscape)
             .Add("redecided", redecided)
             // Bandit：这次重新选择中保留原距离（伏击点还没被试过）/ 重新抽距离的伏击点数
             .Add("distances_kept", redecided ? keptDistances : 0)
@@ -1102,6 +1215,7 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
             .Add("zone", context.Zones.GetZoneName(site.Zone))
             .Add("contact", contact)
             .Add("min_distance", site.MinDistance)
+            .Add("min_distance_in_escape", site.EscapeMinDistance)
             .Add("pressure_contact", pressureContact)
             .Add("alpha", bandit.Alpha(site.Sector, site.DistanceIndex))
             .Add("beta", bandit.Beta(site.Sector, site.DistanceIndex))

@@ -8,9 +8,10 @@
 #   --repeats N   batches per variant, default 2: the repeats are pooled, and their spread is the run-to-run noise
 #   --reference   an older plain-V2 batch to sanity-check the new build against (default 20260926_0138)
 # Variants: V2 (control), TS = -v2Thompson (part A), Bandit = -v2Bandit (part B), TS+Bandit.
-# Ablations: Bandit-joint (bandit also picks the sector, P × θ, as in run 1), Bandit-r2.5 (run 1's contact radius),
-#   Bandit-every (redraw the distance after every escape, also before the site was tried: run 2's Bandit-every),
-#   Bandit-g1 (γ = 1), Bandit-shared (one arm per distance for all sectors), Bandit-keep (no reset between episodes).
+# Ablations: Bandit-joint (bandit also picks the sector, P × θ, as in run 1), Bandit-tail0 (no contact window after
+#   the escape ends: run 2's reward), Bandit-every (redraw the distance after every escape, also before the site was
+#   tried: run 2's Bandit-every), Bandit-g1 (γ = 1), Bandit-shared (one arm per distance for all sectors), Bandit-keep
+#   (no reset between episodes). Run 2's Bandit-r2.5 (run 1's contact radius) is gone: both runs showed ~no contacts.
 # The repeats run as rounds (every variant once, then again), so slow drift can't line up with one variant.
 #
 # Rebuild the eval player first (Tools > Enemy AI > Build Eval Player, or MLTraining/build_eval_player.sh).
@@ -44,8 +45,8 @@ mkdir -p "$OUT"
 names=(V2 TS Bandit TS+Bandit)
 flags=("" "-v2Thompson" "-v2Bandit" "-v2Thompson -v2Bandit")
 if (( ABLATIONS )); then
-  names+=(Bandit-joint Bandit-r2.5 Bandit-every Bandit-g1 Bandit-shared Bandit-keep)
-  flags+=("-v2Bandit -v2BanditJoint" "-v2Bandit -v2ContactRadius 2.5" "-v2Bandit -v2RedrawEveryEscape"
+  names+=(Bandit-joint Bandit-tail0 Bandit-every Bandit-g1 Bandit-shared Bandit-keep)
+  flags+=("-v2Bandit -v2BanditJoint" "-v2Bandit -v2ContactTail 0" "-v2Bandit -v2RedrawEveryEscape"
           "-v2Bandit -v2Gamma 1" "-v2Bandit -v2BanditShared" "-v2Bandit -v2BanditKeep")
 fi
 

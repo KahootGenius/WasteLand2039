@@ -17,13 +17,17 @@ Per persona and variant:
   ambush cause               which check fired: damage / a zombie ahead on the route / a zombie already at the refuge
   contact on the ran route   a site in the sector the player actually ran to had a member within the contact radius,
                              1 s or more after flee onset (what the bandit learns from; the radius is in the batch:
-                             2.5 before 2026-10-07, 6 since)
+                             2.5 before 2026-10-07, 6 since). Since run 3 the window goes on for `tail_seconds` after
+                             the escape ended (until then, or until the next escape / the wave end: "trials scored by")
+  … during the escape only   the same, without the tail (run 2's reward; = the row above for older batches)
   closest on-route ambusher  distribution of that site's closest distance: ≤2.5 / 2.5–4 / 4–6 / 6–10 / >10 / never
-  chaser contact             a pressure-squad member came within the same radius
+  chaser contact             a pressure-squad member came within the same radius (same window)
   contacts by                of escapes with any contact: ambushers only / both / chasers only
   route contact by wave      "contact on the ran route" by wave in the episode (profile and bandit reset each episode)
   hold orders per escape     HoldAt orders / trials: how often ambushers are sent somewhere else (churn)
-  re-decisions               share of escapes after which the commander re-chose its sites (`redecided`, since 2026-10-07)
+  re-decisions               share of escapes after which the commander re-chose its sites (`redecided`, since 2026-10-07;
+                             since run 3 the sampling modes re-choose when a trial's tail ends, not when the next escape
+                             cut it short)
   distances kept / redrawn   Bandit, in those re-decisions: sites left at their distance (not tried yet) vs distances
                              drawn again (`distances_kept` / `distances_redrawn`, since run 3)
   route entropy (H2)         entropy (bits) of the bot's flee routes A/B/C per episode, mean ± sd; max log2(3) = 1.58
@@ -87,7 +91,8 @@ def entropy(counts):
 def new_metrics():
     return {
         "trials": 0, "ambush": 0, "on_route": 0, "chaser": 0, "redecided": 0, "redecided_n": 0, "holds": 0,
-        "kept": 0, "redrawn": 0,
+        "kept": 0, "redrawn": 0, "on_route_in_escape": 0, "tracked_after_end": 0.0,
+        "scored_by": Counter(),
         "split": Counter(), "closest": Counter(),
         "by_wave": defaultdict(lambda: [0, 0]),
         "arms": defaultdict(lambda: [0, 0]),
@@ -124,6 +129,10 @@ def session_metrics(path):
             m["ambush"] += ambush
             m["on_route"] += on_route
             m["chaser"] += chaser
+            # before run 3 there was no tail: the escape-only contact is the contact
+            m["on_route_in_escape"] += e.get("ambush_contact_on_route_in_escape", on_route)
+            m["scored_by"][e.get("scored_by", "EscapeEnd")] += 1
+            m["tracked_after_end"] += e.get("tracked_after_end", 0.0)
             if ambush or chaser:
                 m["split"]["ambushers only" if not chaser else "chasers only" if not ambush else "both"] += 1
             if "redecided" in e:
@@ -153,9 +162,10 @@ def session_metrics(path):
 def merge(sessions):
     total = new_metrics()
     for s in sessions:
-        for k in ("trials", "ambush", "on_route", "chaser", "redecided", "redecided_n", "holds", "kept", "redrawn"):
+        for k in ("trials", "ambush", "on_route", "chaser", "redecided", "redecided_n", "holds", "kept", "redrawn",
+                  "on_route_in_escape", "tracked_after_end"):
             total[k] += s[k]
-        for k in ("split", "held", "closest"):
+        for k in ("split", "held", "closest", "scored_by"):
             total[k] += s[k]
         total["episode_routes"] += s["episode_routes"]
         total["radius"] |= s["radius"]
@@ -189,6 +199,14 @@ def fmt_entropy(episode_routes):
         return "-"
     sd = statistics.stdev(values) if len(values) > 1 else 0.0
     return f"{statistics.mean(values):.2f} ± {sd:.2f} ({len(values)} episodes)"
+
+
+def fmt_scored_by(d):
+    n = d["trials"]
+    if not n:
+        return "-"
+    return " / ".join(ar.pct(d["scored_by"][k] / n) for k in ("Tail", "NextEscape", "WaveEnd", "EscapeEnd")) + \
+        f", {d['tracked_after_end'] / n:.1f} s after the end"
 
 
 def fmt_by_wave(by_wave):
@@ -253,6 +271,8 @@ def main(argv):
         row("ambush cause (damage / ahead / at refuge)", lambda d, r: causes(r))
         row("contact radius", lambda d, r: "/".join(f"{x:g}" for x in sorted(d["radius"])) if d and d["radius"] else "-")
         row("contact on the ran route", lambda d, r: ar.fmt_prop(d["on_route"], d["trials"]) if d else "-")
+        row("… during the escape only", lambda d, r: ar.fmt_prop(d["on_route_in_escape"], d["trials"]) if d else "-")
+        row("trials scored by tail / next escape / wave end / no tail", lambda d, r: fmt_scored_by(d) if d else "-")
         row("closest on-route ambusher ≤2.5/–4/–6/–10/>10/never",
             lambda d, r: fmt_closest(d["closest"]) if d else "-")
         row("ambush contact (any site)", lambda d, r: ar.fmt_prop(d["ambush"], d["trials"]) if d else "-")
@@ -280,6 +300,7 @@ def main(argv):
                 ("bot ambushed", lambda d, r: flee(r, "ambushed")),
                 ("bot ambushed by an ambusher", lambda d, r: flee(r, "by_ambusher")),
                 ("contact on the ran route", lambda d, r: ar.fmt_prop(d["on_route"], d["trials"]) if d else "-"),
+                ("… during the escape only", lambda d, r: ar.fmt_prop(d["on_route_in_escape"], d["trials"]) if d else "-"),
             ]:
                 cells = []
                 for n, prefixes in repeated:
