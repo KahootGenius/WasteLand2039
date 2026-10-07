@@ -7,6 +7,7 @@ Usage:
   python3 .claude/tools/arena-report.py DIR [DIR ...]        # specific session directories
   python3 .claude/tools/arena-report.py --batch 20260925_0707  # batch by timestamp prefix
   python3 .claude/tools/arena-report.py --compare BATCH_A BATCH_B   # commanders side by side
+  (a batch can be several comma-separated prefixes, e.g. two repeats of one variant: they are pooled)
   add --markdown for markdown tables (reports)
 
 A "batch" = all session folders written by one Play session (same yyyyMMdd_HHmmss prefix).
@@ -68,15 +69,20 @@ def batches(root):
 
 
 def batch_dirs(root, prefix=None):
+    """Session folders of the newest batch, or of the batches whose timestamp starts with prefix.
+    Several prefixes can be joined with commas (e.g. two repeats of one variant): their sessions are pooled."""
     grouped = batches(root)
     if not grouped:
         sys.exit(f"no MLArena sessions under {root}")
     if prefix is None:
         return grouped[sorted(grouped)[-1]]
-    matches = [k for k in grouped if k.startswith(prefix)]
-    if not matches:
-        sys.exit(f"no batch starting with {prefix}; batches: {', '.join(sorted(grouped))}")
-    return [d for k in sorted(matches) for d in grouped[k]]
+    dirs = []
+    for p in prefix.split(","):
+        matches = [k for k in grouped if k.startswith(p)]
+        if not matches:
+            sys.exit(f"no batch starting with {p}; batches: {', '.join(sorted(grouped))}")
+        dirs += [d for k in sorted(matches) for d in grouped[k] if d not in dirs]
+    return dirs
 
 
 def first_type_wins(pairs):
