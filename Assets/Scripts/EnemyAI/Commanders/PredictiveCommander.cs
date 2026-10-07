@@ -23,8 +23,9 @@ using UnityEngine;
 /// - 位置（placement = Bandit，B 部分）：伏击老虎机（AmbushBandit），臂 = 扇区 × 离基地的距离档；
 ///   θ 从"玩家确实往那边跑时，伏击者是否接触到玩家"中学习。默认扇区由方向规则决定，老虎机只选距离（ChooseDistance）；
 ///   banditChoosesSector（-v2BanditJoint）= 第一次评估的联合选择（得分 P(扇区) × θ），保留作对照。
-/// - 任一开关打开即为采样模式：不按 predictionInterval 重新预测，只在波次开始和逃跑结束时选择，
-///   而且只在当前伏击"被试过"之后（见 ShouldRedecide）；redecideEveryEscape（-v2RedrawEveryEscape）= 每次逃跑后都重选（对照）。
+/// - 任一开关打开即为采样模式：不按 predictionInterval 重新预测，只在波次开始和每次逃跑结束时选择（方向每次都重新选，与 V2 相同）。
+///   Bandit 的距离只在伏击点被试过（玩家跑进了它的扇区、老虎机更新过）或换了扇区之后重新抽，见 PickDistance；
+///   redrawDistanceEveryEscape（-v2RedrawEveryEscape）= 每次都重新抽（第二次评估的 Bandit-every，对照）。
 ///   minEvidence 门槛在所有模式下都保留；minProbability / switchMargin 只用于 Argmax。
 /// - 试验（逃跑开始时记录各伏击点）：起跑 contactGraceSeconds 秒后，伏击小队任一成员离玩家 ≤ contactRadius 即为接触。
 ///   默认 6 = holdEngageRadius（玩家跑进伏击、伏击者被触发）；第一次评估用的 2.5（= 监测组件的 intercepted）
@@ -138,8 +139,9 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
     [SerializeField] private int samplingSeed = 0;
     [Tooltip("联合选择扇区和距离（得分 P(扇区) × θ，第一次评估的做法，对照用）。关闭 = 扇区由方向规则决定，老虎机只选距离")]
     [SerializeField] private bool banditChoosesSector = false;
-    [Tooltip("采样模式下每次逃跑结束都重新选择（第一次评估的做法，对照用）。关闭 = 只在当前伏击被试过之后重新选择")]
-    [SerializeField] private bool redecideEveryEscape = false;
+    [Tooltip("Bandit 模式下每次重新选择都重新抽距离（第二次评估的 Bandit-every，对照用）。" +
+             "关闭 = 伏击点被试过、或换了扇区之后才重新抽，没被试过的伏击点留在原地")]
+    [SerializeField] private bool redrawDistanceEveryEscape = false;
     [Tooltip("接触：起跑 contactGraceSeconds 秒后伏击者离玩家 ≤ 此距离。默认 6 = holdEngageRadius（伏击者被触发）；" +
              "2.5 = PlayerBehaviourMonitor 的 intercepted（逃跑的机器人几乎从不进入）")]
     [SerializeField] private float contactRadius = 6f;
@@ -164,9 +166,9 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
                     name += "-joint";
                 if (Mathf.Abs(contactRadius - 6f) > 1e-4f)
                     name += "-r" + contactRadius.ToString("0.##", CultureInfo.InvariantCulture);
+                if (redrawDistanceEveryEscape)
+                    name += "-every";
             }
-            if (UsesSampling && redecideEveryEscape)
-                name += "-every";
             return name;
         }
     }
@@ -187,6 +189,8 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
         /// <summary>驻守点（HoldAt 的目标、伏击点生成增援的位置）</summary>
         public Vector2 Position;
         public int Quota;
+        /// <summary>在这里（扇区 + 距离档）布置之后被试过：玩家跑进了这个扇区，老虎机用它更新过</summary>
+        public bool Tried;
         public bool Active => Sector >= 0;
     }
 
@@ -251,6 +255,9 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
     private bool banditSaveWarned;
     private string banditScene;
     private int banditSessions;
+    /// <summary>上一次 Replan 中保留 / 重新抽的距离（遥测 ambush_trial）</summary>
+    private int keptDistances;
+    private int redrawnDistances;
 
     /// <summary>任一自适应开关打开：只在决策点选择</summary>
     private bool UsesSampling => directionChoice == DirectionChoice.Thompson || placement == Placement.Bandit;
@@ -293,7 +300,7 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
             else if (args[i] == "-v2BanditJoint")
                 banditChoosesSector = true;
             else if (args[i] == "-v2RedrawEveryEscape")
-                redecideEveryEscape = true;
+                redrawDistanceEveryEscape = true;
         }
     }
 
@@ -460,6 +467,8 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
 
     private void Replan()
     {
+        keptDistances = 0;
+        redrawnDistances = 0;
         if (!Predict())
         {
             SetSites(-1, -1);
@@ -515,10 +524,39 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
         if (placement == Placement.Bandit)
         {
             // 扇区由方向规则决定（与 FixedRing 相同的分兵规则），老虎机只选距离
-            SetSites(bandit.ChooseDistance(primary), secondary >= 0 ? bandit.ChooseDistance(secondary) : AmbushChoice.None);
+            SetSites(PickDistance(primary), secondary >= 0 ? PickDistance(secondary) : AmbushChoice.None);
             return;
         }
         SetSites(primary, secondary);
+    }
+
+    /// <summary>
+    /// 老虎机为扇区选距离档。该扇区已有伏击点、而且还没被试过时保持原来的距离：每次逃跑后都重新抽的话（第二次评估），
+    /// 没被试过的伏击点也会换位置，伏击者在几个点之间走，等不到玩家。被试过（老虎机更新过）、或扇区是新的时重新抽。
+    /// redrawDistanceEveryEscape = 每次都重新抽（对照）
+    /// </summary>
+    private AmbushChoice PickDistance(int sector)
+    {
+        if (!redrawDistanceEveryEscape)
+        {
+            foreach (AmbushSite site in sites)
+            {
+                if (site.Active && site.Sector == sector && site.DistanceIndex >= 0 && !site.Tried)
+                {
+                    keptDistances++;
+                    float mean = bandit.Mean(sector, site.DistanceIndex);
+                    return new AmbushChoice(sector, site.DistanceIndex, mean, mean);
+                }
+            }
+        }
+        redrawnDistances++;
+        // 重新抽到的是一次新的试验，即使距离档没变（SetSite 不改变原地不动的伏击点）
+        foreach (AmbushSite site in sites)
+        {
+            if (site.Sector == sector)
+                site.Tried = false;
+        }
+        return bandit.ChooseDistance(sector);
     }
 
     /// <summary>第二个伏击方向：与 primary 不相邻、概率 ≥ primary 的 splitRatio 倍中最大的；没有（或 ambushSize &lt; 2）时 -1</summary>
@@ -608,6 +646,7 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
             site.Sector = -1;
             site.Zone = -1;
             site.DistanceIndex = -1;
+            site.Tried = false;
             return;
         }
 
@@ -617,6 +656,7 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
         site.Zone = zone;
         site.DistanceIndex = distanceIndex;
         site.Position = position;
+        site.Tried = false;
         EnemyOrder order = EnemyOrder.HoldAt(position, holdEngageRadius);
         site.Squad.Issue(order);
         LogOrder(site.Squad.Id, order, zone, site.Squad.AliveCount);
@@ -772,33 +812,12 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
 
     private void HandleEscapeEnded(EscapeEpisode escape)
     {
-        // 先记下这次试验的结果（老虎机更新），再按已计入这次逃跑的画像决定是否重新选择
+        // 先记下这次试验的结果（老虎机更新、伏击点标记为被试过），再按已计入这次逃跑的画像重新选择（所有模式每次逃跑后都选）
         TrialOutcome outcome = FinishTrial(escape);
-        bool redecide = !UsesSampling || redecideEveryEscape || ShouldRedecide(escape, outcome);
+        Replan();
         if (outcome != null)
-            LogTrial(escape, outcome, redecide);
-        if (redecide)
-            Replan();
+            LogTrial(escape, outcome, true);
         nextPredictionTime = Time.time + predictionInterval;
-    }
-
-    /// <summary>
-    /// 采样模式下是否重新选择伏击。第一次评估中每次逃跑后都重选，RunnerA 的驻守命令是 V2 的 12–25 倍，
-    /// 伏击者大部分时间在两个点之间走。现在只在当前伏击"被试过"之后重新选择：
-    /// - 还没有伏击点（证据刚够 / 新的一波）；
-    /// - 这次逃跑跑进了某个伏击点所在的扇区（老虎机得到了一次试验）；
-    /// - 这次逃跑是从预测的起点出发的（从基地出发 = 方向预测被检验了一次；PlayerZone 模式下每次逃跑都是）。
-    /// 从避难点等其他地方出发、又没经过伏击点的逃跑不改变部署
-    /// </summary>
-    private bool ShouldRedecide(EscapeEpisode escape, TrialOutcome outcome)
-    {
-        if (!sites[0].Active)
-            return true;
-        if (outcome != null && outcome.Tested)
-            return true;
-        if (!escape.IsValid)
-            return false;
-        return predictFrom == PredictionOrigin.PlayerZone || escape.StartZone == 0;
     }
 
     // ---------- 试验（接触奖励） ----------
@@ -893,10 +912,21 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
             if (tested && learn && site.DistanceIndex >= 0)
             {
                 bandit.Update(site.Sector, site.DistanceIndex, contact);
+                MarkTried(site);
                 LogBanditUpdate(escape, site, contact, outcome.PressureContact);
             }
         }
         return outcome;
+    }
+
+    /// <summary>试验时的伏击点若仍在原处（同一小队、扇区、距离档），标记为被试过：下次选择时重新抽距离</summary>
+    private void MarkTried(TrialSite tried)
+    {
+        foreach (AmbushSite site in sites)
+        {
+            if (site.Squad == tried.Squad && site.Sector == tried.Sector && site.DistanceIndex == tried.DistanceIndex)
+                site.Tried = true;
+        }
     }
 
     // ---------- 跨会话保存 ----------
@@ -1054,6 +1084,9 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
             .Add("pressure_min_distance", outcome.Trial.PressureMinDistance)
             .Add("reacted", outcome.Trial.Reacted)
             .Add("redecided", redecided)
+            // Bandit：这次重新选择中保留原距离（伏击点还没被试过）/ 重新抽距离的伏击点数
+            .Add("distances_kept", redecided ? keptDistances : 0)
+            .Add("distances_redrawn", redecided ? redrawnDistances : 0)
             .Write();
     }
 

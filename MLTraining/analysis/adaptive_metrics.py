@@ -24,6 +24,8 @@ Per persona and variant:
   route contact by wave      "contact on the ran route" by wave in the episode (profile and bandit reset each episode)
   hold orders per escape     HoldAt orders / trials: how often ambushers are sent somewhere else (churn)
   re-decisions               share of escapes after which the commander re-chose its sites (`redecided`, since 2026-10-07)
+  distances kept / redrawn   Bandit, in those re-decisions: sites left at their distance (not tried yet) vs distances
+                             drawn again (`distances_kept` / `distances_redrawn`, since run 3)
   route entropy (H2)         entropy (bits) of the bot's flee routes A/B/C per episode, mean ± sd; max log2(3) = 1.58
   damage / deaths            pressure check: should stay near V2
 Bandit variants also get: contact rate per arm (route × distance, pooled over episodes and repeats) and where sites were
@@ -85,6 +87,7 @@ def entropy(counts):
 def new_metrics():
     return {
         "trials": 0, "ambush": 0, "on_route": 0, "chaser": 0, "redecided": 0, "redecided_n": 0, "holds": 0,
+        "kept": 0, "redrawn": 0,
         "split": Counter(), "closest": Counter(),
         "by_wave": defaultdict(lambda: [0, 0]),
         "arms": defaultdict(lambda: [0, 0]),
@@ -126,6 +129,8 @@ def session_metrics(path):
             if "redecided" in e:
                 m["redecided"] += bool(e["redecided"])
                 m["redecided_n"] += 1
+            m["kept"] += e.get("distances_kept", 0)
+            m["redrawn"] += e.get("distances_redrawn", 0)
             closest = on_route_min(e)
             if closest is not None:
                 m["closest"][next(label for limit, label in DISTANCE_BINS if closest <= limit) if closest != math.inf else "never"] += 1
@@ -148,7 +153,7 @@ def session_metrics(path):
 def merge(sessions):
     total = new_metrics()
     for s in sessions:
-        for k in ("trials", "ambush", "on_route", "chaser", "redecided", "redecided_n", "holds"):
+        for k in ("trials", "ambush", "on_route", "chaser", "redecided", "redecided_n", "holds", "kept", "redrawn"):
             total[k] += s[k]
         for k in ("split", "held", "closest"):
             total[k] += s[k]
@@ -256,6 +261,7 @@ def main(argv):
         row("route contact by wave in episode", lambda d, r: fmt_by_wave(d["by_wave"]) if d else "-")
         row("hold orders per escape", lambda d, r: f"{d['holds'] / d['trials']:.2f}" if d and d["trials"] else "-")
         row("re-decisions", lambda d, r: ar.fmt_prop(d["redecided"], d["redecided_n"]) if d and d["redecided_n"] else "-")
+        row("bandit distances kept / redrawn", lambda d, r: f"{d['kept']} / {d['redrawn']}" if d and d["kept"] + d["redrawn"] else "-")
         row("route entropy per episode (H2, bits)", lambda d, r: fmt_entropy(d["episode_routes"]) if d else "-")
         row("damage per wave / deaths", lambda d, r: damage(r))
     ar.table(["Persona", "Metric"] + names, lines, markdown)
