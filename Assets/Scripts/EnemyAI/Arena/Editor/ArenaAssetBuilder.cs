@@ -722,6 +722,8 @@ public static class ArenaAssetBuilder
     private const string MenuBaseline = "Tools/Enemy AI/Game Commander: Baseline";
     private const string MenuRL = "Tools/Enemy AI/Game Commander: RL";
     private const string MenuV2 = "Tools/Enemy AI/Game Commander: V2 (Predictive)";
+    private const string MenuV2Thompson = "Tools/Enemy AI/V2 Option: Thompson Direction";
+    private const string MenuV2Bandit = "Tools/Enemy AI/V2 Option: Ambush Bandit";
 
     [MenuItem(MenuBaseline, false, 100)]
     private static void UseBaselineInGame()
@@ -752,6 +754,46 @@ public static class ArenaAssetBuilder
         Menu.SetChecked(MenuRL, choice == EnemyAISettings.CommanderChoice.RL);
         Menu.SetChecked(MenuV2, choice == EnemyAISettings.CommanderChoice.Predictive);
         return true;
+    }
+
+    // 自适应尸潮的两个开关（只在游戏场景使用 V2 指挥官时生效；训练场 / 评估用命令行 -v2Thompson / -v2Bandit）
+
+    [MenuItem(MenuV2Thompson, false, 103)]
+    private static void ToggleV2Thompson()
+    {
+        EnemyAISettings settings = EnsureSettings();
+        settings.v2Thompson = !settings.v2Thompson;
+        SaveV2Options(settings);
+    }
+
+    [MenuItem(MenuV2Bandit, false, 104)]
+    private static void ToggleV2Bandit()
+    {
+        EnemyAISettings settings = EnsureSettings();
+        settings.v2Bandit = !settings.v2Bandit;
+        SaveV2Options(settings);
+    }
+
+    [MenuItem(MenuV2Thompson, true)]
+    [MenuItem(MenuV2Bandit, true)]
+    private static bool ValidateV2Options()
+    {
+        EnemyAISettings settings = AssetDatabase.LoadAssetAtPath<EnemyAISettings>(SettingsPath);
+        Menu.SetChecked(MenuV2Thompson, settings != null && settings.v2Thompson);
+        Menu.SetChecked(MenuV2Bandit, settings != null && settings.v2Bandit);
+        return true;
+    }
+
+    private static void SaveV2Options(EnemyAISettings settings)
+    {
+        EditorUtility.SetDirty(settings);
+        AssetDatabase.SaveAssetIfDirty(settings);
+        string options = $"Thompson 方向 {(settings.v2Thompson ? "开" : "关")}，伏击老虎机 {(settings.v2Bandit ? "开" : "关")}";
+        if (settings.gameCommander != EnemyAISettings.CommanderChoice.Predictive)
+            Debug.LogWarning($"[ArenaAssetBuilder] V2 选项：{options}。游戏场景当前使用 {settings.gameCommander}，" +
+                             "选择 Game Commander: V2 (Predictive) 后才生效");
+        else
+            Debug.Log($"[ArenaAssetBuilder] 游戏场景的 V2 选项：{options}");
     }
 
     private static void SetGameCommander(EnemyAISettings.CommanderChoice choice)

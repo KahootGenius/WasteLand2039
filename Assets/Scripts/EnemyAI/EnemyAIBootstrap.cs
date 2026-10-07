@@ -47,6 +47,7 @@ public static class EnemyAIBootstrap
                 continue;
             var commander = spawner.gameObject.AddComponent<PredictiveCommander>();
             commander.Configure(settings.v2Predictor, settings.v2LearnedWeights);
+            commander.ConfigureAdaptive(settings.v2Thompson, settings.v2Bandit);
             Debug.Log($"[EnemyAIBootstrap] {spawner.name}: 使用 V2 指挥官（{commander.DisplayName}）");
         }
     }

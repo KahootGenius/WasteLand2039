@@ -33,6 +33,13 @@ public class EnemyAISettings : ScriptableObject
     [Tooltip("V2 学习型预测器的参数（Assets/ML/Predictors/*.json）")]
     public TextAsset v2LearnedWeights;
 
+    [Tooltip("自适应尸潮 A 部分：V2 的伏击方向按预测分布做 Thompson 采样。关闭 = 总取最可能的方向（V2）")]
+    public bool v2Thompson = false;
+
+    [Tooltip("自适应尸潮 B 部分：V2 的伏击位置由伏击老虎机学习（扇区 × 离基地的距离）。关闭 = 固定圈层（V2）。" +
+             "玩家画像跨会话保存时，老虎机也一起保存（EnemyAIProfiles/场景名.bandit.json）")]
+    public bool v2Bandit = false;
+
     [Tooltip("玩家画像跨会话保存（每个场景一个文件，见 PlayerProfileStore）。关闭 = 每次进入游戏从零开始学习玩家")]
     public bool persistPlayerProfile = true;
 

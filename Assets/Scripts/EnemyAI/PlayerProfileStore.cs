@@ -154,7 +154,8 @@ public static class PlayerProfileStore
             return;
         }
         if (!UnityEditor.EditorUtility.DisplayDialog("删除已保存的玩家画像",
-                $"删除 {files.Length} 个文件？下次进入游戏时敌人 AI 从零开始学习玩家。\n\n{Folder}", "删除", "取消"))
+                $"删除 {files.Length} 个文件（玩家画像，以及自适应尸潮的伏击老虎机 *{AmbushBanditStore.FileSuffix}）？" +
+                $"下次进入游戏时敌人 AI 从零开始学习玩家。\n\n{Folder}", "删除", "取消"))
             return;
         foreach (string file in files)
             File.Delete(file);
