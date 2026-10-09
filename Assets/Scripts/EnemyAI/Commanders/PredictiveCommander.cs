@@ -34,6 +34,13 @@ using UnityEngine;
 ///   波次结束）时结算：只更新玩家实际逃跑方向扇区里的伏击点（其他扇区没有被试验）。采样模式在结算之后才重新选择，
 ///   观察期间伏击点留在原地；新的逃跑提前结束了观察时，等那次逃跑结束再选择。V2 照常在逃跑结束时重新预测（决策不变）。
 /// - 训练场：每回合开始时老虎机回到先验（resetBanditEachEpisode，可关闭以跨回合保留）。
+///
+/// 玩家反应模型（第二层，playerReactionModel / -v2Reaction，默认关闭；只用于从基地预测）：预测器估计玩家往哪跑，
+/// ReactionModel 学习玩家在某个方向遇到僵尸之后会不会避开那里（"输则换"），据此调整预测（Predict），其余规则不变。
+/// 观察单位是"出行"：玩家在离基地中心 outingBaseRadius 以内开始逃跑即出发，方向 = 第一次有效逃跑的方向；
+/// 往外走的途中（起跑 contactGraceSeconds 秒后、离基地超过 outingBaseRadius、还没往回走 5 以上）有僵尸离玩家
+/// ≤ contactRadius 即为"遇到"（记在玩家所在的扇区，出行方向或相邻扇区算数）；回到 outingBaseRadius 以内且不在逃跑时
+/// 出行结束（离基地不足 outingMinDistance 的不算）。所有模式都记录出行（遥测 outing），只有打开时才更新模型。
 /// - 跨会话保存（Bandit 模式，且玩家画像也跨会话保存时）：第一波开始时读取 AmbushBanditStore，
 ///   每波结束、游戏暂停和退出时写入。游戏场景用 EnemyAISettings.v2Thompson / v2Bandit 选择模式（EnemyAIBootstrap）。
 ///
@@ -43,7 +50,7 @@ using UnityEngine;
 /// 命令行（独立运行的评估程序，覆盖 Inspector 设置）：
 ///   -v2Predictor Frequency|Learned   -v2From Base|PlayerZone   -v2React
 ///   -v2Thompson   -v2Bandit   -v2BanditShared   -v2BanditKeep（不按回合重置）   -v2Gamma 0.9   -v2Seed N
-///   -v2ContactRadius 6   -v2ContactTail 5   -v2BanditJoint   -v2RedrawEveryEscape
+///   -v2ContactRadius 6   -v2ContactTail 5   -v2BanditJoint   -v2RedrawEveryEscape   -v2Reaction   -v2ReactionPrior 0.5
 /// </summary>
 public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisodeListener
 {
@@ -154,6 +161,16 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
              "默认 5 ≈ 从基地全速跑到训练场的避难点（26 / 5）。0 = 只看逃跑本身（第二次评估）")]
     [SerializeField] private float contactTailSeconds = 5f;
 
+    [Header("玩家反应模型（自适应尸潮第二层，默认关闭）")]
+    [Tooltip("学习玩家在某个方向遇到僵尸后会不会避开那里，据此调整从基地出发的方向预测（ReactionModel）。只在 predictFrom = Base 时使用")]
+    [SerializeField] private bool playerReactionModel = false;
+    [Tooltip("先验 P(玩家不反应)：越高越需要证据才认定玩家会避开")]
+    [SerializeField, Range(0.01f, 0.99f)] private float reactionPriorNoReaction = ReactionModel.DefaultPriorNoReaction;
+    [Tooltip("出行：在离基地中心这么近的地方开始逃跑 = 从基地出发；回到这么近、而且不在逃跑 = 出行结束")]
+    [SerializeField] private float outingBaseRadius = 10f;
+    [Tooltip("离基地至少这么远才算一次出行（否则只是在基地附近躲闪）。训练场的避难点离基地 26")]
+    [SerializeField] private float outingMinDistance = 15f;
+
     public string DisplayName
     {
         get
@@ -177,6 +194,12 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
                 if (redrawDistanceEveryEscape)
                     name += "-every";
             }
+            if (UsesReaction)
+            {
+                name += "+Reaction";
+                if (Mathf.Abs(reactionPriorNoReaction - ReactionModel.DefaultPriorNoReaction) > 1e-4f)
+                    name += "-p" + reactionPriorNoReaction.ToString("0.##", CultureInfo.InvariantCulture);
+            }
             return name;
         }
     }
@@ -186,6 +209,9 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
 
     /// <summary>伏击老虎机（placement = Bandit 时使用；其他模式下存在但不更新）</summary>
     public AmbushBandit Bandit => bandit;
+
+    /// <summary>玩家反应模型（playerReactionModel 打开时使用；其他模式下存在但不更新）</summary>
+    public ReactionModel Reaction => reaction;
 
     private class AmbushSite
     {
@@ -250,6 +276,22 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
         public readonly List<float> SiteMinDistances = new List<float>();
     }
 
+    /// <summary>一次出行：玩家从基地出发、又回到基地（玩家反应模型的观察单位）</summary>
+    private class Outing
+    {
+        public float StartTime;
+        /// <summary>出发时指挥官使用的预测（反应模型打开时为调整后的）和基础预测</summary>
+        public float[] Prediction;
+        public float[] BasePrediction;
+        /// <summary>第一次有效逃跑的方向扇区；-1 = 还不知道</summary>
+        public int Sector = -1;
+        public float MaxDistance;
+        /// <summary>往外走的途中在哪些扇区遇到了僵尸</summary>
+        public readonly bool[] ContactSectors = new bool[EscapeSectors.Count];
+    }
+
+    private const float OutingTurnBack = 5f;
+
     private readonly AmbushSite[] sites = new AmbushSite[MaxAmbushSites];
     private Squad pressure;
     private HordeContext context;
@@ -259,6 +301,10 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
     private readonly PredictionInput input = new PredictionInput();
     private readonly List<Vector2> enemyPositions = new List<Vector2>();
     private readonly float[] sectorProbabilities = new float[EscapeSectors.Count];
+    /// <summary>反应模型调整之前的预测（反应模型关闭时与 sectorProbabilities 相同）</summary>
+    private readonly float[] baseProbabilities = new float[EscapeSectors.Count];
+    private ReactionModel reaction;
+    private Outing outing;
     private bool hasPrediction;
     private float nextPredictionTime;
     private int pendingSpawnSite = -1;
@@ -284,6 +330,9 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
 
     /// <summary>任一自适应开关打开：只在决策点选择</summary>
     private bool UsesSampling => directionChoice == DirectionChoice.Thompson || placement == Placement.Bandit;
+
+    /// <summary>反应模型调整预测（只用于从基地预测）</summary>
+    private bool UsesReaction => playerReactionModel && predictFrom == PredictionOrigin.Base;
 
     private void Awake()
     {
@@ -326,6 +375,10 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
                 banditChoosesSector = true;
             else if (args[i] == "-v2RedrawEveryEscape")
                 redrawDistanceEveryEscape = true;
+            else if (args[i] == "-v2Reaction")
+                playerReactionModel = true;
+            else if (args[i] == "-v2ReactionPrior" && float.TryParse(next, NumberStyles.Float, CultureInfo.InvariantCulture, out float prior))
+                reactionPriorNoReaction = Mathf.Clamp(prior, 0.01f, 0.99f);
         }
     }
 
@@ -338,6 +391,7 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
         int seed = samplingSeed != 0 ? samplingSeed : unchecked(System.Environment.TickCount * 31 + GetInstanceID());
         samplingRandom = new System.Random(seed);
         bandit = new AmbushBandit(samplingRandom, banditDistances, banditShared, banditDiscount);
+        reaction = new ReactionModel(EscapeSectors.Count, reactionPriorNoReaction);
     }
 
     /// <summary>运行时切换预测器（评估脚本 / EnemyAIBootstrap 用）；须在波次开始前调用</summary>
@@ -393,6 +447,7 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
         drawnDirection = -1;
         trial = null; // 快照引用的是旧小队
         pendingTrial = null;
+        outing = null;
     }
 
     // ---------- IHordeCommander ----------
@@ -449,12 +504,14 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
             nextPredictionTime = Time.time + predictionInterval;
         }
         TrackTrial();
+        TrackOuting();
         FillSites();
     }
 
     public void OnWaveCompleted(HordeContext waveContext)
     {
         ScorePendingTrial(ScoredBy.WaveEnd); // 观察到此为止；下一波开始时重新选择
+        FinishOuting("wave_end");
         Unsubscribe();
         pressure.Issue(EnemyOrder.None);
         foreach (AmbushSite site in sites)
@@ -488,6 +545,9 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
             activePredictor = new FrequencyPredictor();
         }
         activePredictor.Predict(input, sectorProbabilities);
+        System.Array.Copy(sectorProbabilities, baseProbabilities, sectorProbabilities.Length);
+        if (UsesReaction)
+            reaction.Apply(baseProbabilities, sectorProbabilities); // 玩家会避开刚遇到僵尸的方向时，降低那个方向
         hasPrediction = true;
         return true;
     }
@@ -819,6 +879,7 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
 
     private void HandleEscapeStarted(EscapeEpisode escape)
     {
+        BeginOuting(escape);
         LogPrediction(escape);
         BeginTrial(escape); // 在反应式变体挪动伏击之前记录：试验的是"在哪儿等"
         if (!reactToFlee || context == null || context.Zones == null || ambushSize <= 0)
@@ -839,6 +900,9 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
 
     private void HandleEscapeEnded(EscapeEpisode escape)
     {
+        // 出行的方向 = 出行中第一次有效逃跑的方向（与画像"每次交战的第一次逃跑"相同的过滤：有效、位移 > 1）
+        if (outing != null && outing.Sector < 0 && escape.IsValid && escape.Displacement.magnitude > 1f)
+            outing.Sector = RadialZoneMap.DirectionToSector(escape.Displacement, EscapeSectors.Count);
         ScorePendingTrial(ScoredBy.NextEscape); // 正常情况下已在这次逃跑开始时结算
         Trial ended = EndTrial(escape);
         if (ended != null && contactTailSeconds > 0f && escape.EndReason != EscapeEndReason.Interrupted)
@@ -1032,6 +1096,79 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
         }
     }
 
+    // ---------- 出行（玩家反应模型） ----------
+
+    /// <summary>在基地附近开始逃跑 = 出发：记下出发时的预测。上一次出行若已回到基地附近就此结束</summary>
+    private void BeginOuting(EscapeEpisode escape)
+    {
+        if (context == null || context.Zones == null || context.Player == null || !hasPrediction)
+            return;
+        float distance = Vector2.Distance(context.Player.position, context.Zones.GetZoneCenter(0));
+        if (distance > outingBaseRadius)
+            return; // 不是从基地出发（例如在避难点被赶出来）：属于当前出行
+        if (outing != null)
+            FinishOuting("next_outing");
+        outing = new Outing
+        {
+            StartTime = Time.time,
+            Prediction = (float[])sectorProbabilities.Clone(),
+            BasePrediction = (float[])baseProbabilities.Clone(),
+            MaxDistance = distance
+        };
+    }
+
+    /// <summary>
+    /// 出行途中：往外走时（离基地超过 outingBaseRadius、离最远点不到 OutingTurnBack）有僵尸离玩家 ≤ contactRadius，
+    /// 记下玩家所在的扇区；回到基地附近、不在逃跑时出行结束
+    /// </summary>
+    private void TrackOuting()
+    {
+        if (outing == null || context == null || context.Zones == null || context.Player == null)
+            return;
+        Vector2 center = context.Zones.GetZoneCenter(0);
+        Vector2 player = context.Player.position;
+        float distance = Vector2.Distance(player, center);
+        outing.MaxDistance = Mathf.Max(outing.MaxDistance, distance);
+        if (distance > outingBaseRadius && distance >= outing.MaxDistance - OutingTurnBack &&
+            Time.time - outing.StartTime >= contactGraceSeconds && NearestEnemy(player) <= contactRadius)
+        {
+            outing.ContactSectors[RadialZoneMap.DirectionToSector(player - center, EscapeSectors.Count)] = true;
+        }
+        bool escaping = context.Engagement != null && context.Engagement.ActiveEscape != null;
+        if (!escaping && distance <= outingBaseRadius)
+            FinishOuting("returned");
+    }
+
+    private float NearestEnemy(Vector2 player)
+    {
+        float nearest = float.PositiveInfinity;
+        foreach (GameObject enemyObject in context.ActiveEnemies)
+        {
+            Enemy enemy = enemyObject != null ? enemyObject.GetComponent<Enemy>() : null;
+            if (enemy != null && !enemy.IsDead)
+                nearest = Mathf.Min(nearest, Vector2.Distance(enemyObject.transform.position, player));
+        }
+        return nearest;
+    }
+
+    /// <summary>
+    /// 出行结束：方向已知、而且走得够远时算一次观察（遇到 = 出行方向或相邻扇区有接触）。
+    /// 反应模型打开时更新模型（下一次 Predict 起生效）；所有模式都记录遥测 outing
+    /// </summary>
+    private void FinishOuting(string reason)
+    {
+        Outing done = outing;
+        outing = null;
+        if (done == null || done.Sector < 0 || done.MaxDistance < outingMinDistance)
+            return;
+        bool met = false;
+        for (int s = 0; s < EscapeSectors.Count; s++)
+            met |= done.ContactSectors[s] && SectorDistance(s, done.Sector) <= 1;
+        if (UsesReaction)
+            reaction.Observe(done.BasePrediction, done.Sector, met);
+        LogOuting(done, met, reason);
+    }
+
     // ---------- 跨会话保存 ----------
 
     /// <summary>
@@ -1100,8 +1237,11 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
         // 观察期中的试验已在波次结束时结算
         trial = null;
         pendingTrial = null;
+        outing = null;
         if (resetBanditEachEpisode)
             bandit?.Reset();
+        if (arena != null && arena.ResetsProfileEachEpisode)
+            reaction?.Reset(); // 反应模型是画像的一部分：画像重置时一起重置（新的"玩家"）
     }
 
     public void OnArenaEpisodeEnded(ArenaEnvironment arena)
@@ -1165,7 +1305,42 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
             line.Add("drawn_direction", drawnDirection >= 0 ? PlayerProfile.DirectionName(drawnDirection) : "")
                 .Add("sampled_directions", sampledDirections);
         }
+        if (UsesReaction)
+        {
+            line.Add("base_probabilities", baseProbabilities)
+                .Add("reaction_none", reaction.NoReactionProbability);
+        }
         line.Write();
+    }
+
+    /// <summary>每次出行（所有模式）：出发时的预测 vs 实际方向、是否遇到僵尸、反应模型的状态</summary>
+    private void LogOuting(Outing done, bool met, string reason)
+    {
+        if (monitor == null)
+            return;
+        var contacts = new List<string>();
+        for (int s = 0; s < EscapeSectors.Count; s++)
+        {
+            if (done.ContactSectors[s])
+                contacts.Add(PlayerProfile.DirectionName(s));
+        }
+        int predicted = EscapeSectors.Top(done.Prediction, out _);
+        int basePredicted = EscapeSectors.Top(done.BasePrediction, out _);
+        monitor.LogEvent("outing")
+            .Add("sector", PlayerProfile.DirectionName(done.Sector))
+            .Add("met", met)
+            .Add("contact_sectors", contacts)
+            .Add("max_distance", done.MaxDistance)
+            .Add("reason", reason)
+            .Add("predicted", predicted >= 0 ? PlayerProfile.DirectionName(predicted) : "")
+            .Add("p_sector", done.Prediction[done.Sector])
+            .Add("base_predicted", basePredicted >= 0 ? PlayerProfile.DirectionName(basePredicted) : "")
+            .Add("base_p_sector", done.BasePrediction[done.Sector])
+            .Add("reaction", UsesReaction)
+            .Add("reaction_none", reaction.NoReactionProbability)
+            .Add("reaction_strength", reaction.MeanStrength)
+            .Add("reaction_observations", reaction.Observations)
+            .Write();
     }
 
     /// <summary>每次有效逃跑（结算时）：各伏击点 / 压迫小队是否接触（所有模式，包括 V2 对照）</summary>

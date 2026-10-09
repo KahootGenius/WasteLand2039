@@ -64,6 +64,8 @@ public class ArenaEnvironment : MonoBehaviour
     public PlayerBehaviourMonitor Monitor => monitor;
     public HordeEventSpawner Spawner => spawner;
     public IReadOnlyList<ArenaRoute> Routes => routes;
+    /// <summary>每回合开始时重置玩家画像（新的"玩家"）；指挥官据此重置自己学到的玩家模型</summary>
+    public bool ResetsProfileEachEpisode => resetProfileEachEpisode;
 
     /// <summary>true = 机器人停用，由键盘鼠标操作（本回合剩余时间的数据标记为 human）</summary>
     public bool HumanControl
