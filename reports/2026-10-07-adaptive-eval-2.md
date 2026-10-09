@@ -2,7 +2,7 @@
 
 Batch folder: `MLTraining/results/adaptive_eval/20261007_031839/` (`report.md` has every table). Run log:
 `MLTraining/results/adaptive_eval/run_20261007_031723.log`. Code: branch `adaptive-horde` at commit `56db2ef9` (the
-run-2 changes from `workspace/reports/2026-10-06-adaptive-eval-1.md`: contact radius 6, the bandit picks only the
+run-2 changes from `reports/2026-10-06-adaptive-eval-1.md`: contact radius 6, the bandit picks only the
 distance, sites re-chosen only after they were tried or after an escape from the base, 2 repeats per variant).
 
 ## Setup checks

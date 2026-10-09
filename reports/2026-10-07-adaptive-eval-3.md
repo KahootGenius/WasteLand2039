@@ -2,7 +2,7 @@
 
 Batch folder: `MLTraining/results/adaptive_eval/20261007_050453/` (`report.md` has every table). Run log:
 `MLTraining/results/adaptive_eval/run_20261007_050335.log`. Code: branch `adaptive-horde` at commit `c179d99c` (the
-run-3 changes from `workspace/reports/2026-10-07-adaptive-eval-2.md`: `bot_ambushed` records ambusher vs chaser, the
+run-3 changes from `reports/2026-10-07-adaptive-eval-2.md`: `bot_ambushed` records ambusher vs chaser, the
 direction is re-chosen after every escape and an untried site keeps its distance, contact is watched for up to 5 s
 after the escape ends; ablation Bandit-tail0 replaced Bandit-r2.5).
 

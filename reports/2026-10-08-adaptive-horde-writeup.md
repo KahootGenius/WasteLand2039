@@ -41,7 +41,7 @@ lower it.
 **The game.** *Waste Land 2039* is a 2D top-down zombie-survival / base-defense game in Unity 2022.3 (URP 2D). The
 enemy-AI experiment lives on branch `experiment/enemy-ml`:
 - Phase 4: V1, a PPO reinforcement-learning commander. It was far more lethal, but never anticipated a route.
-- Phase 5: V2, "learn to predict, rules act" (`workspace/reports/2026-09-26-phase5-v2-predictive.md`).
+- Phase 5: V2, "learn to predict, rules act" (`reports/2026-09-26-phase5-v2-predictive.md`).
 
 **V2 (the baseline here).**
 - A player profile counts the direction of the first escape of each engagement, with decay.
@@ -83,12 +83,12 @@ The Adaptive bot reacts to exactly this check.
 | Ambush bandit (part B): arms = sector × distance {12, 18, 25}; Beta posteriors discounted toward the prior (γ 0.9); Marsaglia–Tsang Gamma sampler; shared-arm mode; state export / import | `AmbushBandit.cs`, `PredictiveCommander` (`-v2Bandit`, `-v2BanditShared`, `-v2BanditKeep`, `-v2Gamma`, `-v2Seed`, `-v2BanditJoint`) | 1 |
 | Trials: sites snapshotted at flee onset; contact = an ambusher within the contact radius after 1 s; only sites in the sector the player actually ran to are updated | `PredictiveCommander` | 1 |
 | Bandit persistence across sessions; MainGame settings and menus | `AmbushBanditStore.cs`, `EnemyAISettings.cs`, `EnemyAIBootstrap.cs`, `ArenaAssetBuilder.cs` | 1 |
-| Eval player builder, multi-variant runner with repeats, new metrics, comparison tool with pooled repeats | `Arena/Editor/EvalPlayerBuilder.cs`, `MLTraining/build_eval_player.sh`, `MLTraining/eval_adaptive.sh`, `MLTraining/analysis/adaptive_metrics.py`, `.claude/tools/arena-report.py` | 1–2 |
+| Eval player builder, multi-variant runner with repeats, new metrics, comparison tool with pooled repeats | `Arena/Editor/EvalPlayerBuilder.cs`, `MLTraining/build_eval_player.sh`, `MLTraining/eval_adaptive.sh`, `MLTraining/analysis/adaptive_metrics.py`, `MLTraining/tools/arena-report.py` | 1–2 |
 | Contact radius 6 (`-v2ContactRadius`); the bandit picks only the distance in the direction the rule chose | `PredictiveCommander` | 2 |
 | **Ground truth:** each `bot_ambushed` event records the cause (damage / ahead / at the refuge) and the order of the zombie behind it (holding = an ambush squad, otherwise a chaser) | `Bots/BotBrain.cs`, `Arena/PlayerBot.cs`, `Arena/ArenaEnvironment.cs` | 3 |
 | Contact watched for 5 s after the escape ends (`-v2ContactTail`); re-choose after every escape, keep a site's distance until it was tried (`-v2RedrawEveryEscape` = redraw every time) | `PredictiveCommander` | 3 |
 | **Layer 2, player reaction model:** lose-shift learner with candidate avoidance strengths {1 = no reaction, 0.6, 0.35, 0.2, 0.1}, a Bayesian update from the player's choices, probability moved only between routes the player uses; "outings" observed in every mode | `Prediction/ReactionModel.cs`, `PredictiveCommander` (`-v2Reaction`, `-v2ReactionPrior`) | 4 |
-| Logic tests outside Unity (samplers, bandit choice and forgetting, state round trip, Dirichlet sampling, ambush causes, reaction model) | `.claude/tools/logic-tests/BanditTests.cs`, `ReactionTests.cs`, `BotTests.cs` | all |
+| Logic tests outside Unity (samplers, bandit choice and forgetting, state round trip, Dirichlet sampling, ambush causes, reaction model) | `MLTraining/tools/logic-tests/BanditTests.cs`, `ReactionTests.cs`, `BotTests.cs` | all |
 
 All adaptive options are **off by default**. With every option off, the commander gives exactly V2's spawns and
 orders. This was checked after each change in a scripted simulation (a C# harness kept outside the repo).
@@ -271,8 +271,8 @@ On the Mac, with Unity closed:
 
 ```
 git switch adaptive-horde
-.claude/tools/compile-check.sh                 # editor + player compile
-.claude/tools/logic-tests.sh                   # all logic tests, outside Unity
+MLTraining/tools/compile-check.sh                 # editor + player compile
+MLTraining/tools/logic-tests.sh                   # all logic tests, outside Unity
 MLTraining/build_eval_player.sh                # builds MLTraining/builds/eval/MLArena_Eval.app
 MLTraining/eval_adaptive.sh 40 --ablations     # layer 1: V2, TS, Bandit, TS+Bandit + 6 ablations, 2 repeats (run 3)
 MLTraining/eval_adaptive.sh 40 --set reaction --repeats 6   # layer 2 (run 4)
@@ -319,8 +319,8 @@ Every commit on `adaptive-horde` says this too (`Co-Authored-By: Claude`).
   delta on V2, implementing the build guide, which changes to make after each run, and doing layer 2. He ran every
   evaluation on his Mac.
 - **Claude** (Anthropic's AI assistant, through Claude Code), at Lawrence's request:
-  - the plan review and the build guide (`workspace/reports/2026-09-27-adaptive-horde-plan-review.md`,
-    `workspace/plans/2026-09-27-adaptive-horde-on-v2.md`);
+  - the plan review and the build guide (`reports/2026-09-27-adaptive-horde-plan-review.md`,
+    `reports/2026-09-27-adaptive-horde-on-v2.md`);
   - all code and tests on this branch, the evaluation tooling, the analysis and the run reports;
   - earlier, the infrastructure on `experiment/enemy-ml` (tracker, profile, arena, bots, V1, V2).
 

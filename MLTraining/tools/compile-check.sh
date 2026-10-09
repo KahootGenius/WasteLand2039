@@ -6,13 +6,13 @@
 # (reads compiler options from Library/Bee/.../Assembly-CSharp.rsp); the source list is rebuilt
 # from the file system so newly added scripts are included.
 #
-# Usage: .claude/tools/compile-check.sh            -> exit 0 if both flavors compile
-#        VERBOSE=1 .claude/tools/compile-check.sh  -> also print warnings
+# Usage: MLTraining/tools/compile-check.sh            -> exit 0 if both flavors compile
+#        VERBOSE=1 MLTraining/tools/compile-check.sh  -> also print warnings
 set -u
 ROOT="${0:A:h:h:h}"
 U=/Applications/Unity/Hub/Editor/2022.3.62f1/Unity.app/Contents
 P="$U/PlaybackEngines/MacStandaloneSupport/Variations/mono/Managed"
-OUT="$ROOT/.claude/workspace/scratch/compile-check"
+OUT="$ROOT/MLTraining/tools/.out/compile-check"
 mkdir -p "$OUT"
 cd "$ROOT" || exit 2
 

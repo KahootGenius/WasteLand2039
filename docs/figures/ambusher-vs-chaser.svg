@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="374" viewBox="0 0 880 374" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" role="img" aria-labelledby="title desc">
+<title id="title">Who ambushed the bot under V2</title>
+<desc id="desc">Stacked bars per persona: share of flee decisions ambushed by a holding zombie (ambusher) and by a chaser, under plain V2 in run 3. Only RunnerA's ambushes are mostly by ambushers.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#52514e"/></marker></defs>
+<rect x="0.5" y="0.5" width="879" height="373" rx="12" fill="#fcfcfb" stroke="#e1e0d9"/>
+<text x="24.0" y="34.0" font-size="17" fill="#0b0b0b" font-weight="600">Most 'ambushes' were chasers catching up</text>
+<text x="24.0" y="55.0" font-size="12.5" fill="#52514e">Plain V2, run 3, 2 repeats pooled. Share of the bots' flee decisions on which the bot's own ambush check</text>
+<text x="24.0" y="73.0" font-size="12.5" fill="#52514e">fired, split by the zombie that triggered it.</text>
+<rect x="24.0" y="99.0" width="11" height="11" rx="2" fill="#2a78d6"/>
+<text x="40.0" y="108.0" font-size="12" fill="#52514e">by an ambusher (a zombie holding an ambush)</text>
+<rect x="341.2" y="99.0" width="11" height="11" rx="2" fill="#9ec5f4"/>
+<text x="357.2" y="108.0" font-size="12" fill="#52514e">by a chaser</text>
+<line x1="196.0" y1="128.0" x2="196.0" y2="332.0" stroke="#c3c2b7" stroke-width="1"/>
+<text x="196.0" y="349.0" font-size="11" fill="#898781" text-anchor="middle">0%</text>
+<line x1="352.0" y1="128.0" x2="352.0" y2="332.0" stroke="#e1e0d9" stroke-width="1"/>
+<text x="352.0" y="349.0" font-size="11" fill="#898781" text-anchor="middle">25%</text>
+<line x1="508.0" y1="128.0" x2="508.0" y2="332.0" stroke="#e1e0d9" stroke-width="1"/>
+<text x="508.0" y="349.0" font-size="11" fill="#898781" text-anchor="middle">50%</text>
+<line x1="664.0" y1="128.0" x2="664.0" y2="332.0" stroke="#e1e0d9" stroke-width="1"/>
+<text x="664.0" y="349.0" font-size="11" fill="#898781" text-anchor="middle">75%</text>
+<line x1="820.0" y1="128.0" x2="820.0" y2="332.0" stroke="#e1e0d9" stroke-width="1"/>
+<text x="820.0" y="349.0" font-size="11" fill="#898781" text-anchor="middle">100%</text>
+<text x="24.0" y="150.0" font-size="12.5" fill="#0b0b0b" font-weight="600">RunnerA</text>
+<text x="24.0" y="165.0" font-size="11" fill="#898781">always route A</text>
+<rect x="196.0" y="140.0" width="261.1" height="22" fill="#2a78d6"/>
+<path d="M459.1,140.0 H553.9 Q557.9,140.0 557.9,144.0 V158.0 Q557.9,162.0 553.9,162.0 H459.1 Z" fill="#9ec5f4"/>
+<text x="450.1" y="155.5" font-size="11.5" fill="#ffffff" font-weight="600" text-anchor="end">42%</text>
+<text x="467.1" y="155.5" font-size="11.5" fill="#0b0b0b">16%</text>
+<text x="567.9" y="155.5" font-size="11.5"><tspan fill="#52514e" font-weight="600">58% ambushed</tspan><tspan fill="#898781">  ·  72% of them by ambushers</tspan></text>
+<text x="24.0" y="190.0" font-size="12.5" fill="#0b0b0b" font-weight="600">RunnerB80</text>
+<text x="24.0" y="205.0" font-size="11" fill="#898781">route B 80%</text>
+<rect x="196.0" y="180.0" width="167.5" height="22" fill="#2a78d6"/>
+<path d="M365.5,180.0 H591.4 Q595.4,180.0 595.4,184.0 V198.0 Q595.4,202.0 591.4,202.0 H365.5 Z" fill="#9ec5f4"/>
+<text x="356.5" y="195.5" font-size="11.5" fill="#ffffff" font-weight="600" text-anchor="end">27%</text>
+<text x="373.5" y="195.5" font-size="11.5" fill="#0b0b0b">37%</text>
+<text x="605.4" y="195.5" font-size="11.5"><tspan fill="#52514e" font-weight="600">64% ambushed</tspan><tspan fill="#898781">  ·  42% of them by ambushers</tspan></text>
+<text x="24.0" y="230.0" font-size="12.5" fill="#0b0b0b" font-weight="600">Adaptive</text>
+<text x="24.0" y="245.0" font-size="11" fill="#898781">avoids ambushed routes</text>
+<rect x="196.0" y="220.0" width="136.3" height="22" fill="#2a78d6"/>
+<path d="M334.3,220.0 H560.2 Q564.2,220.0 564.2,224.0 V238.0 Q564.2,242.0 560.2,242.0 H334.3 Z" fill="#9ec5f4"/>
+<text x="325.3" y="235.5" font-size="11.5" fill="#ffffff" font-weight="600" text-anchor="end">22%</text>
+<text x="342.3" y="235.5" font-size="11.5" fill="#0b0b0b">37%</text>
+<text x="574.2" y="235.5" font-size="11.5"><tspan fill="#52514e" font-weight="600">59% ambushed</tspan><tspan fill="#898781">  ·  37% of them by ambushers</tspan></text>
+<text x="24.0" y="270.0" font-size="12.5" fill="#0b0b0b" font-weight="600">Mixed</text>
+<text x="24.0" y="285.0" font-size="11" fill="#898781">flees 60%, B over C</text>
+<rect x="196.0" y="260.0" width="130.0" height="22" fill="#2a78d6"/>
+<path d="M328.0,260.0 H585.1 Q589.1,260.0 589.1,264.0 V278.0 Q589.1,282.0 585.1,282.0 H328.0 Z" fill="#9ec5f4"/>
+<text x="319.0" y="275.5" font-size="11.5" fill="#ffffff" font-weight="600" text-anchor="end">21%</text>
+<text x="336.0" y="275.5" font-size="11.5" fill="#0b0b0b">42%</text>
+<text x="599.1" y="275.5" font-size="11.5"><tspan fill="#52514e" font-weight="600">63% ambushed</tspan><tspan fill="#898781">  ·  33% of them by ambushers</tspan></text>
+<text x="24.0" y="310.0" font-size="12.5" fill="#0b0b0b" font-weight="600">Random</text>
+<text x="24.0" y="325.0" font-size="11" fill="#898781">no fixed habit</text>
+<rect x="196.0" y="300.0" width="123.8" height="22" fill="#2a78d6"/>
+<path d="M321.8,300.0 H510.2 Q514.2,300.0 514.2,304.0 V318.0 Q514.2,322.0 510.2,322.0 H321.8 Z" fill="#9ec5f4"/>
+<text x="312.8" y="315.5" font-size="11.5" fill="#ffffff" font-weight="600" text-anchor="end">20%</text>
+<text x="329.8" y="315.5" font-size="11.5" fill="#0b0b0b">31%</text>
+<text x="524.2" y="315.5" font-size="11.5"><tspan fill="#52514e" font-weight="600">51% ambushed</tspan><tspan fill="#898781">  ·  39% of them by ambushers</tspan></text>
+</svg>

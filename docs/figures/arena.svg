@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="462" viewBox="0 0 880 462" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" role="img" aria-labelledby="title desc">
+<title id="title">The ML arena</title>
+<desc id="desc">Top-down map of one arena: the base in the middle, three routes to refuges 26 units out (A east, B north-west, C south-west). A fleeing player on route A has chasers behind it and an ambush squad waiting at the refuge ahead. Candidate ambush distances for the bandit are marked on route B.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#52514e"/></marker></defs>
+<rect x="0.5" y="0.5" width="879" height="461" rx="12" fill="#fcfcfb" stroke="#e1e0d9"/>
+<text x="24.0" y="34.0" font-size="17" fill="#0b0b0b" font-weight="600">The ML arena</text>
+<text x="24.0" y="55.0" font-size="12.5" fill="#52514e">One of the 8 copies that run side by side. Distances in game units (u).</text>
+<line x1="288.8" y1="255.9" x2="427.8" y2="198.3" stroke="#ecebe6" stroke-width="1"/>
+<line x1="266.1" y1="233.2" x2="323.7" y2="94.2" stroke="#ecebe6" stroke-width="1"/>
+<line x1="233.9" y1="233.2" x2="176.3" y2="94.2" stroke="#ecebe6" stroke-width="1"/>
+<line x1="211.2" y1="255.9" x2="72.2" y2="198.3" stroke="#ecebe6" stroke-width="1"/>
+<line x1="211.2" y1="288.1" x2="72.2" y2="345.7" stroke="#ecebe6" stroke-width="1"/>
+<line x1="233.9" y1="310.8" x2="176.3" y2="449.8" stroke="#ecebe6" stroke-width="1"/>
+<line x1="266.1" y1="310.8" x2="323.7" y2="449.8" stroke="#ecebe6" stroke-width="1"/>
+<line x1="288.8" y1="288.1" x2="427.8" y2="345.7" stroke="#ecebe6" stroke-width="1"/>
+<circle cx="250" cy="272" r="42.0" fill="none" stroke="#e1e0d9"/>
+<circle cx="250" cy="272" r="140.0" fill="none" stroke="#e1e0d9"/>
+<text x="250.0" y="246.0" font-size="10.5" fill="#898781" text-anchor="middle">Core</text>
+<text x="250.0" y="185.0" font-size="10.5" fill="#898781" text-anchor="middle">N1</text>
+<text x="250.0" y="108.0" font-size="10.5" fill="#898781" text-anchor="middle">N2</text>
+<line x1="275.2" y1="272.0" x2="432.0" y2="272.0" stroke="#efeee9" stroke-width="18" stroke-linecap="round"/>
+<line x1="275.2" y1="272.0" x2="432.0" y2="272.0" stroke="#c3c2b7" stroke-width="1.5"/>
+<line x1="232.2" y1="254.2" x2="121.3" y2="143.3" stroke="#efeee9" stroke-width="18" stroke-linecap="round"/>
+<line x1="232.2" y1="254.2" x2="121.3" y2="143.3" stroke="#c3c2b7" stroke-width="1.5"/>
+<line x1="232.2" y1="289.8" x2="121.3" y2="400.7" stroke="#efeee9" stroke-width="18" stroke-linecap="round"/>
+<line x1="232.2" y1="289.8" x2="121.3" y2="400.7" stroke="#c3c2b7" stroke-width="1.5"/>
+<rect x="232.5" y="251" width="35" height="42" rx="3" fill="#52514e"/>
+<text x="250.0" y="276.0" font-size="11" fill="#ffffff" font-weight="600" text-anchor="middle">base</text>
+<circle cx="428.5" cy="272.0" r="42.0" fill="#2a78d6" fill-opacity="0.08" stroke="#2a78d6" stroke-opacity="0.45"/>
+<circle cx="432.0" cy="272.0" r="11" fill="#ffffff" stroke="#52514e" stroke-width="1.5"/>
+<text x="432.0" y="276.5" font-size="12" fill="#0b0b0b" font-weight="600" text-anchor="middle">A</text>
+<circle cx="121.3" cy="143.3" r="11" fill="#ffffff" stroke="#52514e" stroke-width="1.5"/>
+<text x="121.3" y="147.8" font-size="12" fill="#0b0b0b" font-weight="600" text-anchor="middle">B</text>
+<circle cx="121.3" cy="400.7" r="11" fill="#ffffff" stroke="#52514e" stroke-width="1.5"/>
+<text x="121.3" y="405.2" font-size="12" fill="#0b0b0b" font-weight="600" text-anchor="middle">C</text>
+<circle cx="422.5" cy="255.0" r="5.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="422.5" cy="289.0" r="5.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<text x="420.5" y="214.0" font-size="11.5" fill="#52514e" text-anchor="middle">ambush squad holds here,</text>
+<text x="420.5" y="229.0" font-size="11.5" fill="#52514e" text-anchor="middle">engages within 6 u</text>
+<line x1="336.0" y1="272.0" x2="367.0" y2="272.0" stroke="#0b0b0b" stroke-width="1.5" marker-end="url(#arrow)"/>
+<circle cx="327.0" cy="272.0" r="6" fill="#0b0b0b" stroke="#fcfcfb" stroke-width="2"/>
+<text x="335.0" y="250.0" font-size="11.5" fill="#52514e" text-anchor="middle">player flees (speed 5)</text>
+<circle cx="299.0" cy="262.0" r="5" fill="#898781" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="296.0" cy="283.0" r="5" fill="#898781" stroke="#fcfcfb" stroke-width="2"/>
+<text x="301.0" y="308.0" font-size="11.5" fill="#52514e" text-anchor="middle">chasers (speed 3)</text>
+<rect x="186.1" y="208.1" width="9" height="9" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2" transform="rotate(45 190.6 212.6)"/>
+<text x="202.6" y="228.6" font-size="11" fill="#52514e">12</text>
+<rect x="156.4" y="178.4" width="9" height="9" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2" transform="rotate(45 160.9 182.9)"/>
+<text x="172.9" y="198.9" font-size="11" fill="#52514e">18</text>
+<rect x="128.7" y="150.7" width="9" height="9" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2" transform="rotate(45 133.2 155.2)"/>
+<text x="145.2" y="171.2" font-size="11" fill="#52514e">25</text>
+<text x="105.3" y="129.3" font-size="12" fill="#0b0b0b" font-weight="600" text-anchor="end">B · north-west</text>
+<text x="105.3" y="422.7" font-size="12" fill="#0b0b0b" font-weight="600" text-anchor="end">C · south-west</text>
+<text x="428.5" y="334.0" font-size="12" fill="#0b0b0b" font-weight="600" text-anchor="middle">A · east</text>
+<circle cx="518.0" cy="100.0" r="5.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<text x="532.0" y="104.0" font-size="12" fill="#52514e">Ambusher: holds a predicted spot (V2)</text>
+<circle cx="518.0" cy="124.0" r="5.5" fill="#898781" stroke="#fcfcfb" stroke-width="2"/>
+<text x="532.0" y="128.0" font-size="12" fill="#52514e">Chaser: follows the player</text>
+<circle cx="518.0" cy="148.0" r="5.5" fill="#0b0b0b" stroke="#fcfcfb" stroke-width="2"/>
+<text x="532.0" y="152.0" font-size="12" fill="#52514e">Player: a bot persona, or a human</text>
+<rect x="513.5" y="167.5" width="9" height="9" fill="#1baf7a" transform="rotate(45 518 172)"/>
+<text x="532.0" y="176.0" font-size="12" fill="#52514e">Candidate spots for the bandit: 12, 18, 25 u</text>
+<circle cx="518" cy="196" r="6.5" fill="#ffffff" stroke="#52514e" stroke-width="1.5"/>
+<text x="532.0" y="200.0" font-size="12" fill="#52514e">Refuge at the end of a route, 26 u out</text>
+<line x1="512.0" y1="220.0" x2="856.0" y2="220.0" stroke="#e1e0d9" stroke-width="1"/>
+<text x="512.0" y="244.0" font-size="13" fill="#0b0b0b" font-weight="600">Rules that shape the problem</text>
+<circle cx="515" cy="264" r="2.2" fill="#52514e"/>
+<text x="524.0" y="268.0" font-size="12" fill="#52514e">Player speed 5, zombie speed 3: a chaser can't catch</text>
+<text x="524.0" y="285.0" font-size="12" fill="#52514e">a runner, so the horde has to be waiting ahead.</text>
+<circle cx="515" cy="308" r="2.2" fill="#52514e"/>
+<text x="524.0" y="312.0" font-size="12" fill="#52514e">The bot counts itself ambushed if, after 1 s of fleeing,</text>
+<text x="524.0" y="329.0" font-size="12" fill="#52514e">it takes damage, meets a zombie within 4 u ahead</text>
+<text x="524.0" y="346.0" font-size="12" fill="#52514e">on its route, or finds one at the refuge.</text>
+<circle cx="515" cy="369" r="2.2" fill="#52514e"/>
+<text x="524.0" y="373.0" font-size="12" fill="#52514e">A wave is Day 3's horde: 20 zombies, 5 alive at once.</text>
+<text x="524.0" y="390.0" font-size="12" fill="#52514e">An episode is 4 waves; then the player model resets,</text>
+<text x="524.0" y="407.0" font-size="12" fill="#52514e">so every episode is a new player.</text>
+</svg>

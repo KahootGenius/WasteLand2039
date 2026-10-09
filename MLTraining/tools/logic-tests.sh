@@ -2,17 +2,17 @@
 # Build and run the EnemyAI pure-logic tests OUTSIDE Unity, using Unity's bundled Roslyn and
 # .NET 6 runtime. Compiles the game's logic sources (zones, player model, telemetry writer, bots,
 # commander actions / rewards, escape predictors)
-# together with .claude/tools/logic-tests/*.cs against UnityEngine.CoreModule.dll.
+# together with MLTraining/tools/logic-tests/*.cs against UnityEngine.CoreModule.dll.
 # Only classes that don't touch Unity engine internals (Time, Debug, scene) can be tested here.
 #
-# Usage: .claude/tools/logic-tests.sh   -> exit 0 when all tests pass
+# Usage: MLTraining/tools/logic-tests.sh   -> exit 0 when all tests pass
 set -u
 ROOT="${0:A:h:h:h}"
 U=/Applications/Unity/Hub/Editor/2022.3.62f1/Unity.app/Contents
 FX=$(ls -d "$U"/NetCoreRuntime/shared/Microsoft.NETCore.App/*/ | head -1)
 FX_VERSION=$(basename "$FX")
 ENGINE="$U/PlaybackEngines/MacStandaloneSupport/Variations/mono/Managed"
-OUT="$ROOT/.claude/workspace/scratch/logic-tests"
+OUT="$ROOT/MLTraining/tools/.out/logic-tests"
 mkdir -p "$OUT"
 cd "$ROOT" || exit 2
 
@@ -23,7 +23,7 @@ SOURCES=(
   Assets/Scripts/EnemyAI/Bots/*.cs(N)
   Assets/Scripts/EnemyAI/Learning/*.cs(N)
   Assets/Scripts/EnemyAI/Prediction/*.cs(N)
-  .claude/tools/logic-tests/*.cs(N)
+  MLTraining/tools/logic-tests/*.cs(N)
 )
 
 REFS=()

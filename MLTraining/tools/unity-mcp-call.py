@@ -2,9 +2,9 @@
 list tools or call one tool. Used to verify the Claude Code -> server -> Unity path
 without restarting the Claude session.
 
-  python3 .claude/tools/unity-mcp-call.py list [filter]
-  python3 .claude/tools/unity-mcp-call.py schema <tool>
-  python3 .claude/tools/unity-mcp-call.py call <tool> '<json args>'
+  python3 MLTraining/tools/unity-mcp-call.py list [filter]
+  python3 MLTraining/tools/unity-mcp-call.py schema <tool>
+  python3 MLTraining/tools/unity-mcp-call.py call <tool> '<json args>'
 """
 import json
 import os

@@ -20,7 +20,7 @@ Plus the measurement that makes it a result: contact rate, route entropy (H2), l
 ## 1. Setup
 
 - Branch from `experiment/enemy-ml`, for example `git switch -c adaptive-horde experiment/enemy-ml`. Your commits on that branch are the authorship record; the base branch's commits carry `Co-Authored-By: Claude`.
-- Unity 2022.3, Editor open. After every C# change, run `.claude/tools/compile-check.sh` (about 4 s; it checks both the editor and player builds). Run `.claude/tools/logic-tests.sh` after touching pure logic.
+- Unity 2022.3, Editor open. After every C# change, run `MLTraining/tools/compile-check.sh` (about 4 s; it checks both the editor and player builds). Run `MLTraining/tools/logic-tests.sh` after touching pure logic.
 
 ## 2. What to write
 
@@ -44,7 +44,7 @@ Responsibilities:
 - Draw `g_d ~ Gamma(a_d)`, normalize, and take the argmax. That's Thompson sampling for direction.
 - Because the profile's counts decay (×0.85 per escape), the evidence saturates at about 6.7. Exploration never fully stops, which is right for a player who adapts.
 
-### 2.2 `.claude/tools/logic-tests/BanditTests.cs` (new)
+### 2.2 `MLTraining/tools/logic-tests/BanditTests.cs` (new)
 
 The test class is `partial` across files: add `static void BanditTests()` and call it from `Main` in `LogicTests.cs` (next to `PredictionTests();`, line 32). Use the existing `Check(bool, name, detail)`. Tests worth having:
 - the Gamma and Beta samplers match the known mean and variance over about 10k draws;
@@ -95,7 +95,7 @@ Size estimate: about 150–200 changed or added lines in this file.
 ### 2.5 Analysis (Python; your own script or notebook, for example `MLTraining/analysis/`)
 
 Data: `~/Library/Application Support/DefaultCompany/Waste Land 2039/EnemyAITelemetry/<batch>_*/`, with `events.jsonl` and `samples.csv`. Header: `t,wave,px,py,vx,vy,hp,zone,state,engagement,escape,near,nearest,retreat,shot_rate,shots,damage,enemies`.
-- **Already computed by `.claude/tools/arena-report.py --compare A B`** (reuse; don't rewrite): per persona, "zombie on route", "ambushed" (bot ground truth), ambushed by wave in the episode (learning curve), pressure (damage and deaths per wave), with Wilson intervals (its `wilson()`).
+- **Already computed by `MLTraining/tools/arena-report.py --compare A B`** (reuse; don't rewrite): per persona, "zombie on route", "ambushed" (bot ground truth), ambushed by wave in the episode (learning curve), pressure (damage and deaths per wave), with Wilson intervals (its `wilson()`).
 - **New, from your `bandit_update` events:**
   - ambush contact rate per trial;
   - the share of contacts made by ambushers vs chasers;
@@ -120,7 +120,7 @@ Data: `~/Library/Application Support/DefaultCompany/Waste Land 2039/EnemyAITelem
    - `... -v2Thompson -v2Bandit`: both.
 
    Old reference batches: Baseline `20260926_0055`, V2 `20260926_0138`. Use them only as a sanity check that the new build's plain V2 matches.
-3. Compare with `python3 .claude/tools/arena-report.py --compare <V2 batch> <variant batch>`, plus your new metrics.
+3. Compare with `python3 MLTraining/tools/arena-report.py --compare <V2 batch> <variant batch>`, plus your new metrics.
    - **Main hypotheses:** B raises "ambushed" for runners without losing pressure; A raises route entropy and keeps the ambush rate against Adaptive.
    - **Ablations:** γ = 1 against γ = 0.9 (vs Adaptive); per-sector against shared arms.
 4. **Humans:**
@@ -142,8 +142,8 @@ Data: `~/Library/Application Support/DefaultCompany/Waste Land 2039/EnemyAITelem
 | Bots incl. Adaptive (route weight ×0.2 when ambushed, 5% recovery per clean escape) | `BotBrain`, `BotPersonaPresets` | `Bots/` |
 | Arena with 3 routes (A east, B NW, C SW; refuges at 26), 8 fixed personas, 4 waves per episode | `MLArena_Eval_V2.unity`, `Arena_V2.prefab` | `Assets/ML/Arena/` |
 | Headless batch runs | `MLTraining/eval.sh` (extra args pass through to the player) | `MLTraining/` |
-| Bot-ground-truth metrics + comparison tables | `arena-report.py` | `.claude/tools/` |
-| Pure-logic tests outside Unity | `logic-tests.sh` (auto-compiles `Prediction/*.cs`) | `.claude/tools/` |
+| Bot-ground-truth metrics + comparison tables | `arena-report.py` | `MLTraining/tools/` |
+| Pure-logic tests outside Unity | `logic-tests.sh` (auto-compiles `Prediction/*.cs`) | `MLTraining/tools/` |
 
 **New:**
 - `AmbushBandit.cs`;

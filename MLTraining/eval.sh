@@ -12,7 +12,7 @@
 # Commander Model (or ArenaAssetBuilder.InstallModel), rebuild the eval player.
 # Telemetry lands in ~/Library/Application Support/DefaultCompany/Waste Land 2039/EnemyAITelemetry/
 # <yyyyMMdd_HHmmss>_<SCENE>_arenaN_<persona>/; compare with
-#   python3 .claude/tools/arena-report.py --compare <baseline batch prefix> <RL batch prefix>
+#   python3 MLTraining/tools/arena-report.py --compare <baseline batch prefix> <RL batch prefix>
 set -euo pipefail
 SCENE=${1:?usage: eval.sh SCENE [GAME_MINUTES]}
 MINUTES=${2:-40}

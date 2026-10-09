@@ -64,3 +64,9 @@ Assets/ML-Agents.meta
 
 # Python bytecode (analysis / training scripts)
 __pycache__/
+
+# Scratch output of MLTraining/tools (compile check, logic tests)
+MLTraining/tools/.out/
+
+# Claude Code workspace (agent notes, plans, backups) stays local on this branch
+.claude/

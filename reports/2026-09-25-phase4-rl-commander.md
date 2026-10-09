@@ -47,7 +47,7 @@
 | Model install | *Tools > Enemy AI > Install Latest Commander Model* (`ArenaAssetBuilder.InstallModel`) | Copies to `Assets/ML/Models/`, detects the scheme, and configures `Arena_RL` and `EnemyAISettings`. |
 | MainGame hook | `EnemyAIBootstrap`, `EnemyAISettings` (`Assets/ML/Resources/`) | With *Game Commander: RL*, adds an inference-only `RLCommander` to spawners that have no commander. There are no scene edits, and the default is **Baseline**. Smoke-tested in MainGame through MCP: squads chased and held zones, no errors. |
 | Telemetry additions | `PlayerBehaviourMonitor`, `RLCommander` | Format 2: `escape_start.enemy_zones`, `escape_end.min_enemy_distance` / `intercepted`, `escape_type` (fixes a duplicate JSON key). New `commander_order` events (squad, order, zone). |
-| Report tool | `.claude/tools/arena-report.py --compare A B [--markdown]` | Wilson 95% intervals. Per-decision route metrics (below). |
+| Report tool | `MLTraining/tools/arena-report.py --compare A B [--markdown]` | Wilson 95% intervals. Per-decision route metrics (below). |
 
 **Reward** (per wave; kept simple as the plan asks):
 - +1 per escape intercepted (a zombie within 2.5 units after the first 1 s);
@@ -69,7 +69,7 @@
   - `v1_ppo_01` final: `20260925_0834`.
 
   All are in `~/Library/Application Support/DefaultCompany/Waste Land 2039/EnemyAITelemetry/`.
-- Command: `python3 .claude/tools/arena-report.py --compare 20260925_0727 20260925_0834`.
+- Command: `python3 MLTraining/tools/arena-report.py --compare 20260925_0727 20260925_0834`.
 - **Deterministic vs sampled play.** By default the eval takes the policy's most likely action, which is what `MainGame` would use. For a policy that is still close to uniform, this can collapse into a single repeated action. The `v1_ppo_02` 400k checkpoint re-tasked only squad 2, back and forth between W1 and SE1, for every persona. So `eval.sh ... -stochastic` also evaluates sampled play, which is how the policy behaved in training.
   - ML-Agents caches one inference runner per model and ignores the deterministic flag when reusing it, so the flag has to be set before the arenas are created. A first attempt that changed it afterwards silently stayed deterministic; batch `20260925_0913` is invalid for that reason.
 

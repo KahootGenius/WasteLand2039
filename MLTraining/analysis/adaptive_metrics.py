@@ -52,7 +52,7 @@ from collections import Counter, defaultdict
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 _spec = importlib.util.spec_from_file_location(
-    "arena_report", os.path.join(HERE, "..", "..", ".claude", "tools", "arena-report.py"))
+    "arena_report", os.path.join(HERE, "..", "tools", "arena-report.py"))
 ar = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(ar)
 

@@ -3,10 +3,10 @@
 the commander did against it.
 
 Usage:
-  python3 .claude/tools/arena-report.py                      # latest batch of MLArena* sessions
-  python3 .claude/tools/arena-report.py DIR [DIR ...]        # specific session directories
-  python3 .claude/tools/arena-report.py --batch 20260925_0707  # batch by timestamp prefix
-  python3 .claude/tools/arena-report.py --compare BATCH_A BATCH_B   # commanders side by side
+  python3 MLTraining/tools/arena-report.py                      # latest batch of MLArena* sessions
+  python3 MLTraining/tools/arena-report.py DIR [DIR ...]        # specific session directories
+  python3 MLTraining/tools/arena-report.py --batch 20260925_0707  # batch by timestamp prefix
+  python3 MLTraining/tools/arena-report.py --compare BATCH_A BATCH_B   # commanders side by side
   (a batch can be several comma-separated prefixes, e.g. two repeats of one variant: they are pooled)
   add --markdown for markdown tables (reports)
 

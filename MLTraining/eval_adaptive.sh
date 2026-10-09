@@ -110,14 +110,14 @@ v2=$(awk -F'\t' '$1=="V2"{print $2}' "$OUT/batches.tsv")
     echo
     echo "## arena-report: V2 vs $name"
     echo
-    python3 .claude/tools/arena-report.py --compare "$v2" "$batch" --markdown
+    python3 MLTraining/tools/arena-report.py --compare "$v2" "$batch" --markdown
   done
   reference=("$ROOT"/${REFERENCE}*_MLArena_Eval_V2_*(N/))
   if (( ${#reference} )); then
     echo
     echo "## Sanity check: old V2 batch $REFERENCE vs the new build's V2"
     echo
-    python3 .claude/tools/arena-report.py --compare "$REFERENCE" "$v2" --markdown
+    python3 MLTraining/tools/arena-report.py --compare "$REFERENCE" "$v2" --markdown
   fi
 } > "$OUT/report.md"
 echo "\nreport: $OUT/report.md"

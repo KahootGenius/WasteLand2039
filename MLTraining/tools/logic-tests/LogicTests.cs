@@ -1,6 +1,6 @@
 // Behavioral tests for the pure-logic EnemyAI classes (zones, engagement tracker, player profile,
 // telemetry writer; bot personas in BotTests.cs), run OUTSIDE Unity against UnityEngine.CoreModule.dll for Vector2/Mathf.
-// Build + run: .claude/tools/logic-tests.sh
+// Build + run: MLTraining/tools/logic-tests.sh
 //
 // Simulated world: 0.1 s steps, zombies walk straight at the player at 3 u/s (like the real
 // baseline AI), player moves at up to 5 u/s. Scenarios mimic the Phase 2 exit criterion
