@@ -31,6 +31,7 @@ static partial class LogicTests
         ProfilePersistenceTests();
         PredictionTests();
         BanditTests();
+        ReactionTests();
 
         Console.WriteLine();
         Console.WriteLine(failures == 0 ? "ALL PASSED" : $"{failures} FAILED");
