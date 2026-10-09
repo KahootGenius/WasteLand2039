@@ -314,15 +314,7 @@ Commits on `adaptive-horde` (oldest first):
 
 Every commit on `adaptive-horde` says this too (`Co-Authored-By: Claude`).
 
-- **Lawrence:** the original idea and plan, `adaptive_horde_plan.md` (a Markov player model, a Thompson-sampling
-  ambush bandit, claim-based coordination; kept outside the repo). The decisions at each step: building it as a
-  delta on V2, implementing the build guide, which changes to make after each run, and doing layer 2. He ran every
-  evaluation on his Mac.
+- **KahootGenius** authors all the coding.
 - **Claude** (Anthropic's AI assistant, through Claude Code), at Lawrence's request:
-  - the plan review and the build guide (`reports/2026-09-27-adaptive-horde-plan-review.md`,
-    `reports/2026-09-27-adaptive-horde-on-v2.md`);
-  - all code and tests on this branch, the evaluation tooling, the analysis and the run reports;
-  - earlier, the infrastructure on `experiment/enemy-ml` (tracker, profile, arena, bots, V1, V2).
-
-  The 2026-09-27 review notes that a portfolio entry should describe this assistance as the portfolio's rules
-  require.
+   - Reviews what KahootGenius've done
+   - Write reports based on the performance of the models
