@@ -1,0 +1,21 @@
+# Third-party sprites and audio aren't redistributed with this repository.
+# Local copies stay on disk; these rules keep them from being added again.
+# The .meta files of the sprites the game uses are still tracked, so the
+# original packs reconnect when they're put back at the same paths.
+*.png
+*.png.meta
+*.wav
+*.wav.meta
+!/ML/Arena/Art/ArenaSquare.png
+!/ML/Arena/Art/ArenaSquare.png.meta
+!/TextMesh Pro/**/*.png
+!/TextMesh Pro/**/*.png.meta
+
+# Unused third-party pack, and folders that only held third-party art
+/3DNPC_Characters/
+/3DNPC_Characters.meta
+/Resources/CP_V1.1.0_nyknck/Animations.meta
+/Resources/ZombieWar/ZombieWar/图集.meta
+/Resources/ZombieWar/ZombieWar/声音.meta
+/Resources/items 1.meta
+/Resources/items.meta
