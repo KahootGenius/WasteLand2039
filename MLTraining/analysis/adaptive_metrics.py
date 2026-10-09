@@ -32,6 +32,13 @@ Per persona and variant:
                              drawn again (`distances_kept` / `distances_redrawn`, since run 3)
   route entropy (H2)         entropy (bits) of the bot's flee routes A/B/C per episode, mean ± sd; max log2(3) = 1.58
   damage / deaths            pressure check: should stay near V2
+Outings (`outing`, since run 4; every variant): the player leaves the base and comes back. Its route = the first valid
+escape's direction; "contact" = a zombie within the contact radius on the way out.
+  commander top-1            the commander's most likely direction when the player set off was the route taken (with the
+                             reaction model: after its adjustment); "base" = the predictor's own, before the adjustment
+  prob. on the route taken   mean probability the commander / the base predictor gave the route taken
+  P(no reaction)             reaction model only: its posterior that this player doesn't avoid where they met zombies,
+                             at the end of each episode (the model resets with the profile every episode), mean ± sd
 Bandit variants also get: contact rate per arm (route × distance, pooled over episodes and repeats) and where sites were
 held at flee onset (`prediction.ambush_sites`).
 Intervals are 95% Wilson score intervals (from arena-report).
@@ -93,6 +100,8 @@ def new_metrics():
         "trials": 0, "ambush": 0, "on_route": 0, "chaser": 0, "redecided": 0, "redecided_n": 0, "holds": 0,
         "kept": 0, "redrawn": 0, "on_route_in_escape": 0, "tracked_after_end": 0.0,
         "scored_by": Counter(),
+        "outings": 0, "outing_met": 0, "top1": 0, "base_top1": 0, "p_route": 0.0, "base_p_route": 0.0,
+        "reaction_end": [], "reaction_on": False,
         "split": Counter(), "closest": Counter(),
         "by_wave": defaultdict(lambda: [0, 0]),
         "arms": defaultdict(lambda: [0, 0]),
@@ -109,6 +118,7 @@ def session_metrics(path):
     m["persona"] = starts[0].get("persona", "human") if starts else "human"
     wave = 0
     routes = Counter()
+    last_none = None  # P(no reaction) after the episode's last outing
     for e in events:
         t = e["type"]
         if t == "episode_start":
@@ -116,6 +126,19 @@ def session_metrics(path):
                 m["episode_routes"].append(routes)
             routes = Counter()
             wave = 0
+            if last_none is not None:
+                m["reaction_end"].append(last_none)
+            last_none = None
+        elif t == "outing":
+            m["outings"] += 1
+            m["outing_met"] += bool(e["met"])
+            m["top1"] += e["predicted"] == e["sector"]
+            m["base_top1"] += e["base_predicted"] == e["sector"]
+            m["p_route"] += e["p_sector"]
+            m["base_p_route"] += e["base_p_sector"]
+            if e.get("reaction"):
+                m["reaction_on"] = True
+                last_none = e["reaction_none"]
         elif t == "wave_start":
             wave += 1
         elif t == "bot_decision" and e.get("mode") == "Flee" and e.get("route") in ROUTES:
@@ -156,6 +179,8 @@ def session_metrics(path):
                 m["held"][(ar.SECTOR_ROUTE.get(sector, sector), distance)] += 1
     if routes:
         m["episode_routes"].append(routes)
+    if last_none is not None:
+        m["reaction_end"].append(last_none)
     return m
 
 
@@ -163,8 +188,11 @@ def merge(sessions):
     total = new_metrics()
     for s in sessions:
         for k in ("trials", "ambush", "on_route", "chaser", "redecided", "redecided_n", "holds", "kept", "redrawn",
-                  "on_route_in_escape", "tracked_after_end"):
+                  "on_route_in_escape", "tracked_after_end", "outings", "outing_met", "top1", "base_top1", "p_route",
+                  "base_p_route"):
             total[k] += s[k]
+        total["reaction_end"] += s["reaction_end"]
+        total["reaction_on"] |= s["reaction_on"]
         for k in ("split", "held", "closest", "scored_by"):
             total[k] += s[k]
         total["episode_routes"] += s["episode_routes"]
@@ -196,6 +224,14 @@ def fmt_closest(closest):
 def fmt_entropy(episode_routes):
     values = [entropy(r) for r in episode_routes if sum(r.values()) >= 2]
     if not values:
+        return "-"
+    sd = statistics.stdev(values) if len(values) > 1 else 0.0
+    return f"{statistics.mean(values):.2f} ± {sd:.2f} ({len(values)} episodes)"
+
+
+def fmt_reaction(d):
+    values = d["reaction_end"]
+    if not d["reaction_on"] or not values:
         return "-"
     sd = statistics.stdev(values) if len(values) > 1 else 0.0
     return f"{statistics.mean(values):.2f} ± {sd:.2f} ({len(values)} episodes)"
@@ -284,6 +320,13 @@ def main(argv):
         row("bandit distances kept / redrawn", lambda d, r: f"{d['kept']} / {d['redrawn']}" if d and d["kept"] + d["redrawn"] else "-")
         row("route entropy per episode (H2, bits)", lambda d, r: fmt_entropy(d["episode_routes"]) if d else "-")
         row("damage per wave / deaths", lambda d, r: damage(r))
+        row("outings from the base (with contact on the way out)",
+            lambda d, r: f"{d['outings']} ({ar.pct(d['outing_met'] / d['outings'])})" if d and d["outings"] else "-")
+        row("commander top-1 on outings", lambda d, r: ar.fmt_prop(d["top1"], d["outings"]) if d and d["outings"] else "-")
+        row("… base predictor's top-1", lambda d, r: ar.fmt_prop(d["base_top1"], d["outings"]) if d and d["outings"] else "-")
+        row("prob. on the route taken (commander / base)",
+            lambda d, r: f"{d['p_route'] / d['outings']:.2f} / {d['base_p_route'] / d['outings']:.2f}" if d and d["outings"] else "-")
+        row("reaction model: P(no reaction) at episode end", lambda d, r: fmt_reaction(d) if d else "-")
     ar.table(["Persona", "Metric"] + names, lines, markdown)
 
     # Run-to-run noise: each repeat on its own, for the metrics the hypotheses are about
@@ -301,6 +344,7 @@ def main(argv):
                 ("bot ambushed by an ambusher", lambda d, r: flee(r, "by_ambusher")),
                 ("contact on the ran route", lambda d, r: ar.fmt_prop(d["on_route"], d["trials"]) if d else "-"),
                 ("… during the escape only", lambda d, r: ar.fmt_prop(d["on_route_in_escape"], d["trials"]) if d else "-"),
+                ("commander top-1 on outings", lambda d, r: ar.fmt_prop(d["top1"], d["outings"]) if d and d["outings"] else "-"),
             ]:
                 cells = []
                 for n, prefixes in repeated:

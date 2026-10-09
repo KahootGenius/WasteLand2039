@@ -2,9 +2,11 @@
 # Adaptive horde experiments (build guide §3): run every variant of the V2 commander on the SAME eval
 # player, so the only difference between batches is the command-line flag, then compare each with plain V2.
 #
-# Usage: MLTraining/eval_adaptive.sh [GAME_MINUTES] [--ablations] [--repeats N] [--reference BATCH]
+# Usage: MLTraining/eval_adaptive.sh [GAME_MINUTES] [--set adaptive|reaction] [--ablations] [--repeats N] [--reference BATCH]
 #   GAME_MINUTES  per run, default 40
-#   --ablations   also run the bandit ablations (see below)
+#   --set         which variants: adaptive (default, layer 1: Thompson direction, ambush bandit) or reaction (layer 2:
+#                 V2, Reaction = -v2Reaction, Reaction-p0.8 = the same with P(no reaction) 0.8 a priori)
+#   --ablations   also run the bandit ablations (set adaptive; see below)
 #   --repeats N   batches per variant, default 2: the repeats are pooled, and their spread is the run-to-run noise
 #   --reference   an older plain-V2 batch to sanity-check the new build against (default 20260926_0138)
 # Variants: V2 (control), TS = -v2Thompson (part A), Bandit = -v2Bandit (part B), TS+Bandit.
@@ -23,11 +25,13 @@ HERE="${0:A:h}"
 cd "$HERE/.."
 
 MINUTES=40
+SET=adaptive
 ABLATIONS=0
 REPEATS=2
 REFERENCE=20260926_0138
 while (( $# )); do
   case $1 in
+    --set) shift; SET=$1 ;;
     --ablations) ABLATIONS=1 ;;
     --repeats) shift; REPEATS=$1 ;;
     --reference) shift; REFERENCE=$1 ;;
@@ -42,16 +46,23 @@ APP="MLTraining/builds/eval/MLArena_Eval.app"
 OUT="MLTraining/results/adaptive_eval/$(date +%Y%m%d_%H%M%S)"
 mkdir -p "$OUT"
 
-names=(V2 TS Bandit TS+Bandit)
-flags=("" "-v2Thompson" "-v2Bandit" "-v2Thompson -v2Bandit")
-if (( ABLATIONS )); then
-  names+=(Bandit-joint Bandit-tail0 Bandit-every Bandit-g1 Bandit-shared Bandit-keep)
-  flags+=("-v2Bandit -v2BanditJoint" "-v2Bandit -v2ContactTail 0" "-v2Bandit -v2RedrawEveryEscape"
-          "-v2Bandit -v2Gamma 1" "-v2Bandit -v2BanditShared" "-v2Bandit -v2BanditKeep")
-fi
+case $SET in
+  adaptive)
+    names=(V2 TS Bandit TS+Bandit)
+    flags=("" "-v2Thompson" "-v2Bandit" "-v2Thompson -v2Bandit")
+    if (( ABLATIONS )); then
+      names+=(Bandit-joint Bandit-tail0 Bandit-every Bandit-g1 Bandit-shared Bandit-keep)
+      flags+=("-v2Bandit -v2BanditJoint" "-v2Bandit -v2ContactTail 0" "-v2Bandit -v2RedrawEveryEscape"
+              "-v2Bandit -v2Gamma 1" "-v2Bandit -v2BanditShared" "-v2Bandit -v2BanditKeep")
+    fi ;;
+  reaction)
+    names=(V2 Reaction Reaction-p0.8)
+    flags=("" "-v2Reaction" "-v2Reaction -v2ReactionPrior 0.8") ;;
+  *) echo "unknown --set $SET (adaptive or reaction)" >&2; exit 2 ;;
+esac
 
 typeset -A batch
-echo "eval player built $(stat -f '%Sm' "$APP/Contents/MacOS"), ${#names} variants × $REPEATS repeats × $MINUTES game-minutes → $OUT"
+echo "eval player built $(stat -f '%Sm' "$APP/Contents/MacOS"), set $SET: ${#names} variants × $REPEATS repeats × $MINUTES game-minutes → $OUT"
 for round in {1..$REPEATS}; do
 for i in {1..${#names}}; do
   before=("$ROOT"/*_MLArena_Eval_V2_*(N/:t))
@@ -86,7 +97,7 @@ v2=$(awk -F'\t' '$1=="V2"{print $2}' "$OUT/batches.tsv")
 {
   echo "# Adaptive horde eval, $(date '+%Y-%m-%d %H:%M')"
   echo
-  echo "$MINUTES game-minutes per run, $REPEATS repeats per variant (pooled), scene MLArena_Eval_V2, same eval player for every run."
+  echo "Set $SET, $MINUTES game-minutes per run, $REPEATS repeats per variant (pooled), scene MLArena_Eval_V2, same eval player for every run."
   echo
   echo '```'
   cat "$OUT/batches.tsv"
