@@ -37,6 +37,8 @@ You defend a base for up to 30 days, and each day can bring a horde. You craft a
 
 To play, open the project in Unity 2022.3.62f1, open `Assets/MainMenu.unity` and press Play.
 
+The game's sprites and audio are third-party assets and aren't included in this repository, so a fresh clone opens with missing sprites. The code compiles and the logic tests run without them. The `.meta` files of the sprites the game uses are kept, so the original art reconnects if it's put back at the same paths.
+
 ## Branches
 
 | Branch | What's on it |
