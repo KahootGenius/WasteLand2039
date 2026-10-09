@@ -312,9 +312,26 @@ Commits on `adaptive-horde` (oldest first):
 
 ## 10. Who did what
 
-Every commit on `adaptive-horde` says this too (`Co-Authored-By: Claude`).
-
-- **KahootGenius** authors all the coding.
+- **Lawrence** (GitHub: KahootGenius; some commits as TaoziQ):
+  - the idea and the plan, `adaptive_horde_plan.md`, written before any code: a Markov player model, a
+    Thompson-sampling ambush bandit and claim-based coordination. The Thompson direction choice and the ambush
+    bandit were built; the Markov model and claim-based coordination were not.
+  - the adaptive-horde code on this branch: `Prediction/AmbushBandit.cs` (the ambush bandit and `ThompsonSampling`),
+    `Prediction/ReactionModel.cs` (layer 2), `AmbushBanditStore.cs`, and the adaptive modes in
+    `Commanders/PredictiveCommander.cs`.
+    [CONFIRM, keep only what you typed: the arena and bot changes, `EvalPlayerBuilder.cs`, `eval_adaptive.sh`,
+    `adaptive_metrics.py`, `make_figures.py`, `BanditTests.cs`, `ReactionTests.cs`]
+  - the decisions at each step: building on V2, which changes to make after each run, and adding layer 2.
+  - every evaluation run.
 - **Claude** (Anthropic's AI assistant, through Claude Code), at Lawrence's request:
-   - Reviews what KahootGenius've done
-   - Write reports based on the performance of the models
+  - before this branch, on `experiment/enemy-ml`: the tracker, player profile, arena, bots, V1 (RL) and V2
+    (predictive). This branch includes them because the build needs them.
+  - the plan review and the build guide (`reports/2026-09-27-adaptive-horde-plan-review.md`,
+    `reports/2026-09-27-adaptive-horde-on-v2.md`).
+  - [CONFIRM: whichever of the tests, evaluation scripts and analysis tooling are not yours]
+  - the run reports, this write-up and the README.
+
+Two commits on this branch carry a `Co-Authored-By: Claude` trailer; the division above applies to every commit.
+
+An earlier version of this section, and the README, said Claude wrote all the code on this branch. That was wrong
+for the adaptive-horde files listed under Lawrence, and was corrected on 2026-10-09.
