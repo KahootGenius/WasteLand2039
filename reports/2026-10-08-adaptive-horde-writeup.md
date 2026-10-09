@@ -319,8 +319,8 @@ Commits on `adaptive-horde` (oldest first):
   - the adaptive-horde code on this branch: `Prediction/AmbushBandit.cs` (the ambush bandit and `ThompsonSampling`),
     `Prediction/ReactionModel.cs` (layer 2), `AmbushBanditStore.cs`, and the adaptive modes in
     `Commanders/PredictiveCommander.cs`.
-    [CONFIRM, keep only what you typed: the arena and bot changes, `EvalPlayerBuilder.cs`, `eval_adaptive.sh`,
-    `adaptive_metrics.py`, `make_figures.py`, `BanditTests.cs`, `ReactionTests.cs`]
+    `EvalPlayerBuilder.cs`, `eval_adaptive.sh`,
+    `adaptive_metrics.py`, `make_figures.py`, `BanditTests.cs`, `ReactionTests.cs`
   - the decisions at each step: building on V2, which changes to make after each run, and adding layer 2.
   - every evaluation run.
 - **Claude** (Anthropic's AI assistant, through Claude Code), at Lawrence's request:
@@ -328,7 +328,7 @@ Commits on `adaptive-horde` (oldest first):
     (predictive). This branch includes them because the build needs them.
   - the plan review and the build guide (`reports/2026-09-27-adaptive-horde-plan-review.md`,
     `reports/2026-09-27-adaptive-horde-on-v2.md`).
-  - [CONFIRM: whichever of the tests, evaluation scripts and analysis tooling are not yours]
+  - The Arena and the bot changes
   - the run reports, this write-up and the README.
 
 Two commits on this branch carry a `Co-Authored-By: Claude` trailer; the division above applies to every commit.
