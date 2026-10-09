@@ -368,4 +368,4 @@ Start with `reports/2026-09-25-phase4-rl-commander.md` (V1), `reports/2026-09-26
 
 ## Credits
 
-The experiment's division of work is set out in [section 10 of the adaptive-horde write-up](reports/2026-10-08-adaptive-horde-writeup.md#10-who-did-what): the idea, the decisions at each step and every evaluation run were Lawrence's; the code, tests, evaluation tooling, analysis and reports were written by Claude (Anthropic's AI assistant, through Claude Code) at Lawrence's request.
+The division of work is set out in [section 10 of the adaptive-horde write-up](reports/2026-10-08-adaptive-horde-writeup.md#10-who-did-what). In short: the idea, the plan, the decisions at each step, every evaluation run, and the adaptive-horde code (the ambush bandit, Thompson direction sampling and the player reaction model) are Lawrence's. The tracker, profile, arena, bots, V1 and V2 inherited from `experiment/enemy-ml`, the run reports and this README were written by Claude (Anthropic's AI assistant, through Claude Code) at Lawrence's request.
