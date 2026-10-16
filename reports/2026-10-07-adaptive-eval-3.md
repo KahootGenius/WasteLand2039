@@ -84,9 +84,15 @@ Bandit arms, contact rate when the player ran into the site's sector (all person
    the bot flees again", and the adaptive modes re-decide after only 16–29% of the runners' and Adaptive's valid
    escapes.
 7. **Against Adaptive the limit is prediction, not placement.** V2's top-1 route prediction for Adaptive is 24%
-   (run 2: 30%), below the 33% chance level, and Adaptive's route entropy is at the ceiling (1.54 of 1.58 bits) in
-   every variant. The bot steers away from routes where it was ambushed, so a frequency count of past routes points
-   at the route it is about to avoid. Sampling from that same count (Thompson) can't fix it.
+   (32/131; run 2: 30%, 36/120), which is at chance once ties are accounted for: the metric counts a tie for the most
+   zombies as a miss, so chance is 24.9% (run 2: 23.9%), not 33%. Without the ties it is 33% (32/98; run 2: 42%,
+   36/86), and both intervals include 33%. Adaptive's route entropy is at the ceiling (1.54 of 1.58 bits) in every
+   variant. The bot steers away from routes where it was ambushed, and a frequency count of past routes doesn't know
+   which flees were ambushed, so it carries no information about this bot's next route. Sampling from that same
+   count (Thompson) can't fix it.
+   *(Corrected 2026-10-15: this item first said "below the 33% chance level". 33% is the wrong chance level for a
+   metric that scores ties as misses; `MLTraining/tools/arena-report.py` now prints the tie-adjusted chance and the
+   hit rate on untied decisions.)*
 
 ## Where this leaves the build guide's hypotheses
 

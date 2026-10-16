@@ -35,7 +35,12 @@ Per bot flee decision (ground truth route; the escape_start within 2 s supplies 
                    a zombie ahead on the route, a zombie already at the refuge)
   route predicted  plan §4 test: the route sector holding the most zombies (unique max) is the route
                    the bot takes; only decisions made outside all route sectors with some route
-                   occupied count; chance = 1/3
+                   occupied count. A tie at the maximum (e.g. a split ambush, one zombie at each of two
+                   sites) counts as a miss, so chance is NOT 1/3: with no information it is
+                   (share of decisions with a unique max) / 3, the "tie-adjusted chance" row. The
+                   "untied only" row drops the ties: hits / decisions with a unique max, against 1/3.
+                   Both baselines assume the bot's route ignores the zombies and its routes are about
+                   equally likely. (Before 2026-10-15 the hit rate was labelled "chance 33%", which was wrong.)
   ambush on route  (V2 only, `prediction` events at flee onset) the commander had an ambush site with at
                    least one member in the chosen route's sector: the plan §4 wording ("has a squad at B
                    before flee onset"), whether or not the squad is standing there at that moment
@@ -118,8 +123,8 @@ def load_session(path):
 
 # ---------------------------------------------------------------- stats helpers
 
-def pct(x):
-    return f"{x * 100:.0f}%"
+def pct(x, digits=0):
+    return f"{x * 100:.{digits}f}%"
 
 
 def wilson(k, n, z=1.96):
@@ -132,11 +137,11 @@ def wilson(k, n, z=1.96):
     return (p, max(0.0, center - half), min(1.0, center + half))
 
 
-def fmt_prop(k, n):
+def fmt_prop(k, n, digits=0):
     if n == 0:
         return "-"
     p, lo, hi = wilson(k, n)
-    return f"{pct(p)} [{pct(lo)}–{pct(hi)}] ({k}/{n})"
+    return f"{pct(p, digits)} [{pct(lo, digits)}–{pct(hi, digits)}] ({k}/{n})"
 
 
 def sector(zone):
@@ -226,9 +231,12 @@ def summarize(path):
             "cause": cause,  # Damage / AheadOnRoute / AtRefuge (None: not ambushed, or older telemetry)
             "on_route": counts[d["route"]] > 0 if bot_sector != route_sector else None,
             # top-1 prediction: the route sector with the most zombies is the one the bot takes
-            # (only when the bot is outside all route sectors and some route has zombies; chance 1/3)
+            # (only when the bot is outside all route sectors and some route has zombies; a tie at the max
+            # is a miss, so chance is untied share / 3, not 1/3)
             "predicted": (counts[d["route"]] == best and list(counts.values()).count(best) == 1)
                          if bot_sector not in SECTOR_ROUTE and best > 0 else None,
+            "tied": list(counts.values()).count(best) > 1
+                    if bot_sector not in SECTOR_ROUTE and best > 0 else None,
             "ambush_on_route": (any(sector(a.split(":")[0]) == route_sector and int(a.split(":")[1]) > 0
                                     for a in prediction.get("ambush", []))
                                 if prediction is not None and bot_sector != route_sector else None),
@@ -301,11 +309,20 @@ def flee_stats(flees):
         "on_route": sum(f["on_route"] for f in known),
         "predicted_n": len(guessed),
         "predicted": sum(f["predicted"] for f in guessed),
+        "untied_n": sum(not f["tied"] for f in guessed),
         "truth_n": len(truth),
         "by_ambusher": sum(f["by_ambusher"] for f in truth),
         "by_chaser": sum(f["ambushed"] and not f["by_ambusher"] for f in truth),
         "causes": Counter(f["cause"] for f in truth if f["cause"]),
     }
+
+
+def fmt_tie_chance(st):
+    """No-information chance of "route predicted": a tie at the max is a miss, so only the decisions with a
+    unique max can hit, and a route chosen without looking at the zombies hits one of those 1 time in 3"""
+    if st["predicted_n"] == 0:
+        return "-"
+    return f"{pct(st['untied_n'] / st['predicted_n'] / 3, 1)} ({st['untied_n']}/{st['predicted_n']} untied, / 3)"
 
 
 def ambush_by_wave(flees):
@@ -428,8 +445,11 @@ def compare(a, b, markdown):
                      fmt_counter(fb["causes"], CAUSES) or "-"],
                 ]
             lines += [
-                [persona, "flee: route predicted (top-1, chance 33%)", fmt_prop(fa["predicted"], fa["predicted_n"]),
-                 fmt_prop(fb["predicted"], fb["predicted_n"])],
+                [persona, "flee: route predicted (top-1, ties = miss)", fmt_prop(fa["predicted"], fa["predicted_n"], 1),
+                 fmt_prop(fb["predicted"], fb["predicted_n"], 1)],
+                [persona, "flee: route predicted, tie-adjusted chance", fmt_tie_chance(fa), fmt_tie_chance(fb)],
+                [persona, "flee: route predicted, untied only (chance 33%)", fmt_prop(fa["predicted"], fa["untied_n"], 1),
+                 fmt_prop(fb["predicted"], fb["untied_n"], 1)],
             ]
             if fa["ambush_n"] or fb["ambush_n"]:
                 lines.append([persona, "flee: ambush on route (V2)", fmt_prop(fa["ambush_on_route"], fa["ambush_n"]),
