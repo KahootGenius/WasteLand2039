@@ -207,16 +207,16 @@ The adaptive layers were four controlled runs on branch `adaptive-horde`. Each r
 |---|---|---|---|
 | 1 | 2026-10-06 | Thompson direction; ambush bandit with a 2.5-unit contact reward | **The reward never fired:** 0 of 277 RunnerA trials under the bandit made contact (1 of 2,231 across all seven variants), because fleeing bots never get that close. With nothing but misses, the untried arms' optimistic priors pulled ambushes **off** the route (RunnerA ambush on route 82% → 53% with Thompson + Bandit). |
 | 2 | 2026-10-07 | contact radius 6 (a holding zombie's engage radius); the bandit picks only the distance; 2 repeats | The bandit optimized its reward (RunnerA contact 4% → 11%) and "learned" that 12 units is best, but the bots weren't ambushed more (RunnerB80 68% → 58%). |
-| 3 | 2026-10-07 | **ground truth:** ambusher vs chaser; contact watched 5 s past the escape end | "Bot ambushed" had mostly counted chasers. With the full window, every distance works equally, so run 2's "best distance" was an artifact. Bandit = V2; Thompson is worse for every persona. |
+| 3 | 2026-10-07 | **ground truth:** ambusher vs chaser; contact watched past the escape end (up to 5 s, about 2 s in practice) | "Bot ambushed" had mostly counted chasers. With the full window, every distance works equally, so run 2's "best distance" was an artifact. Bandit = V2; Thompson is worse for every persona. |
 | 4 | 2026-10-08 | layer 2, the player reaction model; 6 repeats | No effect on real ambushes. The adjustment didn't even improve prediction, because the model learned from the wrong signal. |
 
 **"Bot ambushed" was mostly chasers.** Splitting the bots' ambush check by the zombie that triggered it changed what the earlier numbers meant. For every persona except RunnerA, most ambushes came from chasers catching up:
 
 ![Stacked bars: share of flee decisions ambushed by an ambusher vs by a chaser, per persona](docs/figures/ambusher-vs-chaser.svg)
 
-**The measurement window manufactured a result.** The escape tracker ends most escapes before the bot reaches the refuge where V2 waits. Scored only during the escape, near sites looked best. Watched 5 s longer, the three distances score about the same:
+**The measurement window manufactured a result.** The escape tracker ends most escapes before the bot reaches the refuge where V2 waits. Scored only during the escape, near sites looked best. Watched about 2 s longer, the three distances score about the same. (The window allowed up to 5 s, but the bot's next flee usually ended it after about 2 s.)
 
-![Contact rate by ambush distance, with and without the 5 s tail, for routes A, B and C](docs/figures/contact-window.svg)
+![Contact rate by ambush distance, scored during the escape only and with the tail after it, for routes A, B and C](docs/figures/contact-window.svg)
 
 **With the ground truth, no variant beats plain V2.** Every interval overlaps V2's band, and the Thompson variants fall below it for the Adaptive persona:
 
@@ -230,7 +230,17 @@ The adaptive layers were four controlled runs on branch `adaptive-horde`. Each r
 
 *Run 3 (2 repeats) and run 4 (6 repeats). In run 4 the six repeats of plain V2 alone ranged from 17% to 28% for Adaptive.*
 
-Against the Adaptive bot, the bottleneck is prediction, not placement. V2's route prediction for it is at chance once ties are accounted for. In run 4 the route sector with the most zombies was the bot's route at 24% of its flees (92/383). That metric counts a tie for the most as a miss, and 113 of the 383 decisions were ties (mostly an ambush split one zombie per site), so chance is 23.5% (270/383 ÷ 3), not 33%. Without the ties the hit rate is 34.1% [28.7–39.9] (92/270), against 33%. The commander's own top-1 guess is right 35.5% of the time, against 35.3% if its guesses were unrelated to the route (runs 2–4 pooled). After an ambush on a route the bot mostly switches away, while V2's count keeps pointing there; after a clean escape the count is right more often, and the two cancel out. The reaction model was meant to fix that. But it counted any zombie within 6 units on the way out as "met", including chasers behind the player. That fired on 74% of Adaptive's outings, while the bot itself reacted on 56% of its flees, so the model couldn't tell this bot from players who don't react.
+**Against the Adaptive bot, the bottleneck is prediction, not placement.** V2's own top-1 guess of the route was right almost every time for the bot with a fixed habit, close to the ceiling for the bot with an 80% habit, and about a third of the time, no better than chance, for the bot that changes route after being caught:
+
+| Bot | V2's guess right | Guessing from the bot's hidden route odds | No information |
+|---|---|---|---|
+| RunnerA (always route A) | **98.3%** [97.2–99.0] (825/839) | 100% | 33.3% |
+| RunnerB80 (route B 80% of the time) | **75.2%** [72.9–77.3] (1,100/1,463) | 80.0%, the ceiling | 33.3% |
+| Adaptive (avoids a route after being caught on it) | **35.5%** [32.3–38.8] (302/851) | 60.3% | 33.3% (uniform); 35.3% if guess and route were independent |
+
+*Plain V2, runs 2–4 pooled. The guess is the most likely sector in V2's from-base prediction when the bot decides to flee (E = A, NW = B, SW = C), counted once the commander has 2 or more escapes of evidence; decisions whose top sector isn't one of the three routes are left out. "Independent" keeps V2's mix of guesses and the bot's mix of routes but pairs them at random. Computed on 2026-10-15 from the runs' telemetry (`prediction` and `bot_decision` events); that analysis script isn't in the repository.*
+
+The zombie-count metric agrees once ties are handled. In run 4, on the flee decisions without a tie for the most zombies, the most-occupied route sector was the bot's route 34.1% [28.7–39.9] of the time (92/270), against 33%. (`arena-report.py` scores a tie as a miss, which puts that metric's chance level at 23.5% for these decisions rather than 33%, and its count, 92 of 383, sits right at it.) The guess fails because V2 counts *where* the bot ran, not *whether it was caught there*: after an ambush on a route the bot mostly switches away, while V2's count keeps pointing there; after a clean escape the count is right more often, and the two cancel out. The reaction model was meant to fix that. But it counted any zombie within 6 units on the way out as "met", including chasers behind the player. That fired on 74% of Adaptive's outings, while the bot itself reacted on 56% of its flees, so the model couldn't tell this bot from players who don't react.
 
 ## Verdict by version
 
@@ -242,7 +252,7 @@ Against the Adaptive bot, the bottleneck is prediction, not placement. V2's rout
 | V2, learned predictor | yes, slightly less | near Baseline | More accurate at flee onset, but that accuracy depends on information a pre-placed ambush doesn't have. Kept as an option. |
 | V2 + Thompson direction | worse | near V2 | Exploration costs ambushes against predictable players and didn't help against the adaptive one, whose routes are already near maximum entropy (1.5 of 1.58 bits). |
 | V2 + ambush bandit | same as V2 | near V2 | Learns its reward correctly, but in this arena *where along the route* to wait doesn't matter, so there's nothing to learn. |
-| V2 + reaction model | same as V2 | near V2 | The idea is sound in simulation (top-1 33% → 57% in the scripted harness), but it learned from a signal that isn't what the player reacts to. |
+| V2 + reaction model | same as V2 | near V2 | It works on a simulated player that follows the Adaptive rule (top-1 30% → 40% in the logic tests, `ReactionTests.cs`), but in the arena it learned from a signal that isn't what the player reacts to. |
 
 Every adaptive option is **off by default**. In MainGame, Baseline stays the default too; V2 and RL are menu options.
 
