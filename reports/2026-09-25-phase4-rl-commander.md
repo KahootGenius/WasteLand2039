@@ -15,7 +15,7 @@
   - deaths per wave are up for all 7 personas.
 - **It does not do what the plan's §4 test asks: it doesn't predict the route.**
   - It learned "chase, plus a fixed ring of holding squads" (mostly N1, NE2, SW2). The ring is the same whichever way the bot runs.
-  - For RunnerB80 (flees via B 80% of the time), the most-occupied route at flee onset matched the bot's route 23% of the time, below chance (33%). On B flees it matched only 1 time in 32.
+  - For RunnerB80 (flees via B 80% of the time), the most-occupied route at flee onset matched the bot's route 23% [13–37] of the time (11/48): no better than chance (33%). On B flees it matched only 1 time in 32.
   - Only 2% of its hold orders went to B's sector.
 - **Exit criterion:**
   - "Beats the baseline on interception vs every persona": met on the bot-side ambush measure. On the stricter monitor measure (a zombie within 2.5 units), it's met for 4 of 6 fleeing personas; RunnerA and Mixed are not significant.
@@ -25,7 +25,9 @@
   - a smaller action space (RetaskOne: re-task at most one squad every 2 s);
   - a reward bonus when the intercepting zombie comes from **in front** of the fleeing player.
 
-  Its policy is sharper (entropy 67% of maximum vs 82%), and its holds now depend on the persona: fighters and kiters get the south-west, and RunnerA gets more east. But it almost never holds B (0% of hold orders in deterministic play, 2–6% sampled). Route prediction for RunnerB80 stays below chance: 19% deterministic, 23% sampled.
+  Its policy is sharper (entropy 67% of maximum vs 82%), and its holds now depend on the persona: fighters and kiters get the south-west, and RunnerA gets more east. But it almost never holds B (0% of hold orders in deterministic play, 2–6% sampled). Route prediction for RunnerB80 is again no better than chance: 19% [11–32] deterministic (10/52) and 23% [14–34] sampled (14/62), against a chance level of 31% for both.
+
+  *(Corrected 2026-10-17: this bullet and the first run's said "below chance". The intervals above include chance, so "no better than chance" is what the data supports. Chance is 33% for deterministic `v1_ppo_01` and 31% for `v1_ppo_02`: the metric counts a tie for the most zombies as a miss, and a few of `v1_ppo_02`'s decisions are ties (see Measuring pre-positioning). Of the four V1 batches, only sampled `v1_ppo_01` is just under its chance level: 19.1% [11.5–30.0] (13/68) against 30.4%.)*
 - **Conclusion for V1.** In this setup, PPO learns *pressure* (chasing plus a persona-independent, south-west-heavy holding ring) but not *route anticipation*. Both runs, each in deterministic and sampled play, pass the interception part of the exit criterion on the bot-side ambush measure, and all four fail the §4 test.
   - The recommended next step is **V2** (supervised escape-zone prediction plus scripted squad tactics), which attacks exactly this gap. The RL runs serve as its control.
   - Ideas for a further RL attempt are listed at the end.
@@ -111,7 +113,7 @@ The plan's test: *"Runner-B flees via B 80%. Success means the commander has a s
 
 **Per-decision metrics (new in `arena-report.py`).** There is one sample per bot flee decision, using the bot's ground-truth route and enemy positions from the escape that starts within 2 s. The bot's route choice is a pure weighted roll, so zombies don't bias which route it picks.
 - **Zombie on route:** a zombie was in the chosen route's sector when the bot decided. It only counts decisions made outside that sector, so chasers don't count.
-- **Route predicted (top-1):** the route sector with the most zombies is the one the bot takes. It counts only decisions made outside all route sectors, with at least one route occupied. Chance is 1/3.
+- **Route predicted (top-1):** the route sector with the most zombies is the one the bot takes. It counts only decisions made outside all route sectors, with at least one route occupied. A tie for the most counts as a miss, so chance is 1/3 only when there are no ties; in general it is (share of decisions without a tie) / 3. Ties are rare in Phase 4, so chance is 28–33% in every cell below. *(Corrected 2026-10-17; this said "Chance is 1/3".)*
 - **Ambushed, by wave in the episode:** the profile resets each episode, so a commander that learns the player should improve from wave 1 to wave 4.
 - **Hold orders by route sector,** from `commander_order`.
 
@@ -180,7 +182,7 @@ So Mixed's 50% is an artifact, and on its main route B the policy never had the 
 | Kiter | damage / deaths | 32 / 11 of 41 | 85 / 44 of 52 | 66 / 29 of 47 | 87 / 45 of 53 | 72 / 32 of 46 |
 | Fighter | damage / deaths | 66 / 28 of 62 | 88 / 59 of 80 | 94 / 69 of 82 | 98 / 116 of 122 | 97 / 88 of 93 |
 
-*Route anticipation.* "On route" = a zombie was in the chosen route's sector when the bot decided to flee (bot outside it). "Predicted" = the most-occupied route sector was the bot's route (chance 33%).
+*Route anticipation.* "On route" = a zombie was in the chosen route's sector when the bot decided to flee (bot outside it). "Predicted" = the most-occupied route sector was the bot's route (chance: 1/3 of the decisions without a tie, 28–33% here).
 
 | Persona | Metric | Baseline | 01 det | 01 sampled | 02 det | 02 sampled |
 |---|---|---|---|---|---|---|

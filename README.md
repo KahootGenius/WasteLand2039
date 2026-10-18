@@ -129,7 +129,7 @@ All paths are under `Assets/Scripts/EnemyAI/`. Every adaptive option is a comman
 
 ## How they were evaluated
 
-- **Same build, same bots.** All commanders ran on the same headless eval player, with the same 8 arenas (7 personas; RunnerB80 runs in two) and fixed seeds. Each run is 40 game-minutes per arena, about 7–8 episodes per persona. For the adaptive layers, every variant ran on one build and differed only by a command-line flag, with plain V2 as the control in every run.
+- **Same build, same bots.** All commanders ran on the same headless eval player, with the same 8 arenas (7 personas; RunnerB80 runs in two) and the same bot seeds. The seeds are the same in every repeat too, so repeats aren't independent (see *Limitations*). Each run is 40 game-minutes per arena, about 7–8 episodes per persona. For the adaptive layers, every variant ran on one build and differed only by a command-line flag, with plain V2 as the control in every run.
 - **Repeats and intervals.** Intervals are 95% Wilson intervals. The adaptive runs ran each variant once in run 1, twice in runs 2–3 and six times in run 4, executed in rounds, so slow drift can't line up with one variant. The repeats are pooled, and each one is also reported on its own as the run-to-run noise.
 - **Scale.** The adaptive study alone took 65 runs of 40 game-minutes with 8 arenas each, about 350 hours of simulated play.
 
@@ -152,12 +152,12 @@ Both PPO runs are far more dangerous than Baseline against every persona. Fleein
 
 | RunnerB80 (flees by B 80%) | Baseline | `v1_ppo_01` | `v1_ppo_02` |
 |---|---|---|---|
-| Route predicted (chance 33%) | – | 23% | 19% |
+| Route predicted (chance about 1/3) | – | 23% [13–37] | 19% [11–32] |
 | Hold orders sent to route B's sector | – | 2% | 0% |
 | Bot ambushed | 27% | 70% | 73% |
 | Damage per wave · deaths | 10 · 4 of 54 | 61 · 40 of 76 | 43 · 24 of 68 |
 
-*Deterministic play, Phase 4 batches. Sampled play (`-stochastic`) tells the same story: RunnerB80's route is predicted at 19–23%.*
+*Deterministic play, Phase 4 batches. Both route-predicted intervals include chance (33% for `v1_ppo_01`; 31% for `v1_ppo_02`, where a few decisions are ties), so V1 predicts the route no better than chance. Sampled play (`-stochastic`) tells the same story: RunnerB80's route is predicted at 19–23%, against a chance level of 30–31%.*
 
 The likely causes: the reward pays the same for a zombie that waited on the route as for one that ran the player down, and chasing is much easier to discover. On top of that, the action space is large for a 2 M-decision budget.
 
@@ -263,6 +263,7 @@ Every adaptive option is **off by default**. In MainGame, Baseline stays the def
 - **Short learning windows.** Every model resets each episode (4 waves, about 15 flees). In MainGame the profile and the bandit persist across sessions; the reaction model isn't wired into MainGame.
 - **Partly circular test.** The Adaptive bot's avoidance rule has the same form as the reaction model, so a win would have been partly circular. The loss is still informative.
 - **Power.** Runs 2–3 could detect differences of about 10 points and run 4 about 5. Ground-truth attribution on damage uses the nearest zombie within 2.5 units.
+- **Repeats share the bots' random seeds.** Every repeat reuses the same bot RNG seed (`System.Random(20260925 + 7919·k)` for arena k, set in `ArenaManager.cs`), so the repeats are not independent and the reported intervals are too narrow.
 - **V1's budget.** Two runs of 2 M decisions each. A longer run, route-level actions or a hindsight reward might change the V1 picture.
 
 ## Reproducing the results
