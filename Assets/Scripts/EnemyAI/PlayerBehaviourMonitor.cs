@@ -768,7 +768,7 @@ public class PlayerBehaviourMonitor : MonoBehaviour
 
     private void OnGUI()
     {
-        if (!showOverlay || tracker == null)
+        if (!showOverlay || tracker == null || RecordingHud.Visible) // 录制 HUD 占用同一位置
             return;
 
         if (overlayStyle == null)

@@ -282,7 +282,8 @@ public class ArenaManager : MonoBehaviour
 
     private void OnGUI()
     {
-        if (arenas.Count == 0)
+        // 录制 HUD 打开时由它显示（英文）状态，这里不再显示中文状态栏
+        if (arenas.Count == 0 || RecordingHud.Visible)
             return;
 
         if (statusStyle == null)

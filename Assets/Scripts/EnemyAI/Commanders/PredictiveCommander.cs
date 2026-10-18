@@ -213,6 +213,41 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
     /// <summary>玩家反应模型（playerReactionModel 打开时使用；其他模式下存在但不更新）</summary>
     public ReactionModel Reaction => reaction;
 
+    // ---------- 录制 HUD（RecordingHud）的只读访问，不改变任何行为 ----------
+
+    /// <summary>当前的逃跑方向预测（8 个扇区，0 = 正东，逆时针）；HasPrediction 为 false 时无意义</summary>
+    public IReadOnlyList<float> SectorProbabilities => sectorProbabilities;
+    public bool HasPrediction => hasPrediction;
+    /// <summary>上一次 Replan 是否足够确定、可以布置伏击（证据门槛之后）</summary>
+    public bool PredictionConfident => confident;
+    public float MinEvidence => minEvidence;
+    public int AmbushSize => ambushSize;
+    public float HoldEngageRadius => holdEngageRadius;
+    /// <summary>试验的接触距离（伏击者离玩家这么近 = 接触）</summary>
+    public float ContactRadius => contactRadius;
+    public bool UsesBanditPlacement => placement == Placement.Bandit;
+    public bool UsesThompsonDirection => directionChoice == DirectionChoice.Thompson;
+    public int AmbushSiteCount => sites.Length;
+
+    /// <summary>第 index 个伏击点；没有布置时返回 false</summary>
+    public bool TryGetAmbushSite(int index, out int sector, out Vector2 position, out int distanceIndex, out Squad squad, out int quota)
+    {
+        AmbushSite site = index >= 0 && index < sites.Length ? sites[index] : null;
+        bool active = site != null && site.Active;
+        sector = active ? site.Sector : -1;
+        position = active ? site.Position : Vector2.zero;
+        distanceIndex = active ? site.DistanceIndex : -1;
+        squad = site != null ? site.Squad : null;
+        quota = active ? site.Quota : 0;
+        return active;
+    }
+
+    /// <summary>最近一次结算的试验：玩家实际逃跑的扇区、该扇区有没有伏击点、伏击者有没有接触到玩家、结算时间（-1 = 还没有）</summary>
+    public int LastTrialRanSector { get; private set; } = -1;
+    public bool LastTrialTested { get; private set; }
+    public bool LastTrialContact { get; private set; }
+    public float LastTrialTime { get; private set; } = -1f;
+
     private class AmbushSite
     {
         public Squad Squad;
@@ -1083,6 +1118,10 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
                 LogBanditUpdate(escape, site, contact, outcome.PressureContact);
             }
         }
+        LastTrialRanSector = outcome.RanSector;
+        LastTrialTested = outcome.Tested;
+        LastTrialContact = outcome.TestedContact;
+        LastTrialTime = Time.time;
         return outcome;
     }
 
