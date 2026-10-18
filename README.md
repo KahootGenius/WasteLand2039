@@ -137,7 +137,7 @@ All paths are under `Assets/Scripts/EnemyAI/`. Every adaptive option is a comman
 |---|---|
 | **Zombie on route** | When the bot decides to flee, a zombie is already in the sector of the route it then takes. Only decisions made outside that sector count, so chasers don't. |
 | **Ambush on route** (V2) | V2's ambush was assigned to the bot's route at flee onset. |
-| **Route predicted** (top-1) | The commander's most likely route is the bot's route. Chance is 33%. |
+| **Route predicted** (top-1) | The route sector holding the most zombies when the bot decides to flee is the route it takes. A tie for the most counts as a miss, so chance is 33% only when there are no ties; in general it is (share of decisions without a tie) / 3. `arena-report.py` prints that tie-adjusted chance and the hit rate on the untied decisions next to it. |
 | **Bot ambushed** | The bot's own check: after 1 s of fleeing it takes damage, meets a zombie within 4 units ahead on its route, or finds one at the refuge. |
 | **Ambushed by an ambusher** | The same check, credited to a zombie that was *holding* an ambush rather than chasing. This is the ground truth from run 3 on, and the primary outcome for the adaptive layers. |
 | **Damage and deaths per wave** | Pressure, to make sure anticipation isn't bought by gutting the rest of the horde. |
@@ -230,7 +230,7 @@ The adaptive layers were four controlled runs on branch `adaptive-horde`. Each r
 
 *Run 3 (2 repeats) and run 4 (6 repeats). In run 4 the six repeats of plain V2 alone ranged from 17% to 28% for Adaptive.*
 
-Against the Adaptive bot, the bottleneck is prediction, not placement. V2's top-1 route prediction for it is 24%, below chance, because the bot avoids exactly the route the counts point at. The reaction model was meant to fix that. But it counted any zombie within 6 units on the way out as "met", including chasers behind the player. That fired on 74% of Adaptive's outings, while the bot itself reacted on 56% of its flees, so the model couldn't tell this bot from players who don't react.
+Against the Adaptive bot, the bottleneck is prediction, not placement. V2's route prediction for it is at chance once ties are accounted for. In run 4 the route sector with the most zombies was the bot's route at 24% of its flees (92/383). That metric counts a tie for the most as a miss, and 113 of the 383 decisions were ties (mostly an ambush split one zombie per site), so chance is 23.5% (270/383 ÷ 3), not 33%. Without the ties the hit rate is 34.1% [28.7–39.9] (92/270), against 33%. The commander's own top-1 guess is right 35.5% of the time, against 35.3% if its guesses were unrelated to the route (runs 2–4 pooled). After an ambush on a route the bot mostly switches away, while V2's count keeps pointing there; after a clean escape the count is right more often, and the two cancel out. The reaction model was meant to fix that. But it counted any zombie within 6 units on the way out as "met", including chasers behind the player. That fired on 74% of Adaptive's outings, while the bot itself reacted on 56% of its flees, so the model couldn't tell this bot from players who don't react.
 
 ## Verdict by version
 

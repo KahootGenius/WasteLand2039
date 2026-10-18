@@ -193,7 +193,13 @@ gets about 70% contact:
   placement bandit has nothing to learn.
 - Thompson direction is worse for every persona, including Adaptive (22% → 12%, z ≈ 2.6). Re-drawing the direction
   after every escape also made it move the ambushers about 10× as often as V2.
-- V2 predicts Adaptive's route *below* chance (24% top-1): the bot avoids the route the counts point at.
+- V2's route prediction for Adaptive is at chance once ties are accounted for. The most-occupied route sector was
+  the bot's route at 24% of its flees (32/131), but the metric counts a tie for the most as a miss, so chance is
+  24.9% (98/131 untied ÷ 3), not 33%; without the ties it is 33% (32/98). Run 4 gives the same picture: 24.0%
+  (92/383) against a tie-adjusted chance of 23.5%, and 34.1% [28.7–39.9] (92/270) without the ties. The
+  commander's own top-1 guess is right 35.5% of the time, against 35.3% if guess and route were independent (runs
+  2–4 pooled): it carries no information about this bot, rather than pointing the wrong way. An earlier version of
+  this write-up called it below chance, by comparing it with 33%.
 
 ### Run 4 (2026-10-08): layer 2, the player reaction model
 
@@ -257,6 +263,9 @@ Pre-run checks:
   window was usually cut short by the next escape (about 2 s on average for the runners).
 - **Power.** Runs 2–3 had 2 repeats per variant, enough for differences of about 10 points. Run 4 had 6, enough for
   about 5.
+- **Repeats share the bots' random seeds.** Every repeat reuses the same bot RNG seed
+  (`System.Random(20260925 + 7919·k)` for arena k), so the repeats are not independent and the reported intervals
+  are too narrow.
 
 ## 8. Possible next steps
 
