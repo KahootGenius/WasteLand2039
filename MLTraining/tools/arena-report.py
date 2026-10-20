@@ -53,7 +53,9 @@ import statistics
 import sys
 from collections import Counter, defaultdict
 
-DEFAULT_ROOT = os.path.expanduser(
+# The eval player's telemetry folder; ENEMYAI_TELEMETRY_ROOT points this (and adaptive_metrics.py) at a copy instead,
+# e.g. MLTraining/results/telemetry, where eval_adaptive.sh copies every batch it runs
+DEFAULT_ROOT = os.environ.get("ENEMYAI_TELEMETRY_ROOT") or os.path.expanduser(
     "~/Library/Application Support/DefaultCompany/Waste Land 2039/EnemyAITelemetry")
 RECALL_WINDOW = 3.0
 FLEE_ONSET_WINDOW = 2.0

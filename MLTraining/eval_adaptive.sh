@@ -2,13 +2,19 @@
 # Adaptive horde experiments (build guide §3): run every variant of the V2 commander on the SAME eval
 # player, so the only difference between batches is the command-line flag, then compare each with plain V2.
 #
-# Usage: MLTraining/eval_adaptive.sh [GAME_MINUTES] [--set adaptive|reaction] [--ablations] [--repeats N] [--reference BATCH]
+# Usage: MLTraining/eval_adaptive.sh [GAME_MINUTES] [--set adaptive|reaction|all] [--ablations] [--repeats N]
+#                                    [--seed N] [--legacy-bot] [--reference BATCH]
 #   GAME_MINUTES  per run, default 40
-#   --set         which variants: adaptive (default, layer 1: Thompson direction, ambush bandit) or reaction (layer 2:
-#                 V2, Reaction = -v2Reaction, Reaction-p0.8 = the same with P(no reaction) 0.8 a priori)
+#   --set         which variants: adaptive (default, layer 1: Thompson direction, ambush bandit), reaction (layer 2:
+#                 V2, Reaction = -v2Reaction, Reaction-p0.8 = the same with P(no reaction) 0.8 a priori), or all
+#                 (every commander so far: V2, TS, Bandit, TS+Bandit, Reaction; e.g. to re-measure them after the bot changed)
 #   --ablations   also run the bandit ablations (set adaptive; see below)
 #   --repeats N   batches per variant, default 2: the repeats are pooled, and their spread is the run-to-run noise
-#   --reference   an older plain-V2 batch to sanity-check the new build against (default 20260926_0138)
+#   --seed N      round r uses arena seed N + 104729 × (r - 1) for every variant (-arenaSeed, see ArenaManager), default
+#                 20261020: the variants of one round share the bots' random draws, so they pair up; rounds are independent
+#   --legacy-bot  run the bot as it was before 2026-10-20 (-botLegacySenses: sees every zombie), to reproduce older batches
+#   --reference   an older plain-V2 batch to sanity-check the new build against (default 20260926_0138; "none" to skip).
+#                 Batches from before 2026-10-20 used the legacy bot: compare them with a --legacy-bot run
 # Variants: V2 (control), TS = -v2Thompson (part A), Bandit = -v2Bandit (part B), TS+Bandit.
 # Ablations: Bandit-joint (bandit also picks the sector, P × θ, as in run 1), Bandit-tail0 (no contact window after
 #   the escape ends: run 2's reward), Bandit-every (redraw the distance after every escape, also before the site was
@@ -18,8 +24,10 @@
 #
 # Rebuild the eval player first (Tools > Enemy AI > Build Eval Player, or MLTraining/build_eval_player.sh).
 # Output: MLTraining/results/adaptive_eval/<stamp>/
-#   batches.tsv   variant, telemetry batch prefixes (comma-separated, one per repeat), flags
+#   batches.tsv   variant, telemetry batch prefixes (comma-separated, one per repeat), flags, arena seeds (one per repeat)
 #   report.md     arena-report --compare (V2 vs each variant, old V2 vs new V2) + adaptive_metrics.py
+# Every batch's telemetry is also copied into MLTraining/results/telemetry/ (git-ignored; an APFS clone, so it takes no
+# extra disk space): the analysis tools read it with ENEMYAI_TELEMETRY_ROOT=MLTraining/results/telemetry
 set -euo pipefail
 HERE="${0:A:h}"
 cd "$HERE/.."
@@ -28,12 +36,16 @@ MINUTES=40
 SET=adaptive
 ABLATIONS=0
 REPEATS=2
+SEED=20261020
+LEGACY_BOT=0
 REFERENCE=20260926_0138
 while (( $# )); do
   case $1 in
     --set) shift; SET=$1 ;;
     --ablations) ABLATIONS=1 ;;
     --repeats) shift; REPEATS=$1 ;;
+    --seed) shift; SEED=$1 ;;
+    --legacy-bot) LEGACY_BOT=1 ;;
     --reference) shift; REFERENCE=$1 ;;
     *) MINUTES=$1 ;;
   esac
@@ -41,10 +53,17 @@ while (( $# )); do
 done
 
 ROOT="$HOME/Library/Application Support/DefaultCompany/Waste Land 2039/EnemyAITelemetry"
+COPY="MLTraining/results/telemetry"
 APP="MLTraining/builds/eval/MLArena_Eval.app"
 [[ -d $APP ]] || { echo "no eval player at $APP; build it first" >&2; exit 2; }
 OUT="MLTraining/results/adaptive_eval/$(date +%Y%m%d_%H%M%S)"
-mkdir -p "$OUT"
+mkdir -p "$OUT" "$COPY"
+bot_args=()
+bot_senses="player-like (sees what the camera shows)"
+if (( LEGACY_BOT )); then
+  bot_args=(-botLegacySenses)
+  bot_senses="legacy (sees every zombie)"
+fi
 
 case $SET in
   adaptive)
@@ -58,19 +77,26 @@ case $SET in
   reaction)
     names=(V2 Reaction Reaction-p0.8)
     flags=("" "-v2Reaction" "-v2Reaction -v2ReactionPrior 0.8") ;;
-  *) echo "unknown --set $SET (adaptive or reaction)" >&2; exit 2 ;;
+  all)
+    names=(V2 TS Bandit TS+Bandit Reaction)
+    flags=("" "-v2Thompson" "-v2Bandit" "-v2Thompson -v2Bandit" "-v2Reaction") ;;
+  *) echo "unknown --set $SET (adaptive, reaction or all)" >&2; exit 2 ;;
 esac
 
-typeset -A batch
-echo "eval player built $(stat -f '%Sm' "$APP/Contents/MacOS"), set $SET: ${#names} variants × $REPEATS repeats × $MINUTES game-minutes → $OUT"
+typeset -A batch seeds
+echo "eval player built $(stat -f '%Sm' "$APP/Contents/MacOS"), set $SET: ${#names} variants × $REPEATS repeats × $MINUTES game-minutes, bot $bot_senses → $OUT"
 for round in {1..$REPEATS}; do
+seed=$(( SEED + (round - 1) * 104729 ))
 for i in {1..${#names}}; do
   before=("$ROOT"/*_MLArena_Eval_V2_*(N/:t))
-  echo "\n=== ${names[i]} (${flags[i]:-no flags}), repeat $round of $REPEATS"
-  MLTraining/eval.sh MLArena_Eval_V2 "$MINUTES" ${=flags[i]}
+  echo "\n=== ${names[i]} (${flags[i]:-no flags}), repeat $round of $REPEATS, arena seed $seed"
+  MLTraining/eval.sh MLArena_Eval_V2 "$MINUTES" ${=flags[i]} -arenaSeed $seed $bot_args
   after=("$ROOT"/*_MLArena_Eval_V2_*(N/:t))
   new=(${after:|before})
   (( ${#new} )) || { echo "no new telemetry folders for ${names[i]}" >&2; exit 1; }
+  for d in $new; do
+    cp -cR "$ROOT/$d" "$COPY/" 2>/dev/null || cp -R "$ROOT/$d" "$COPY/"
+  done
   # the batch prefix: what the new folders' timestamps (yyyyMMdd_HHmmss) have in common; it must not
   # also match older folders (arena-report selects batches by this prefix)
   prefix=$(python3 - "$ROOT" $new <<'PY'
@@ -84,13 +110,14 @@ print(prefix)
 PY
 )
   batch[${names[i]}]=${batch[${names[i]}]:+${batch[${names[i]}]},}$prefix
-  echo "batch ${names[i]} #$round: $prefix (${#new} arenas)"
+  seeds[${names[i]}]=${seeds[${names[i]}]:+${seeds[${names[i]}]},}$seed
+  echo "batch ${names[i]} #$round: $prefix (${#new} arenas, copied to $COPY)"
 done
 done
 
-printf "variant\tbatch\tflags\n" > "$OUT/batches.tsv"
+printf "variant\tbatch\tflags\tseeds\n" > "$OUT/batches.tsv"
 for i in {1..${#names}}; do
-  printf "%s\t%s\t%s\n" "${names[i]}" "${batch[${names[i]}]}" "${flags[i]}" >> "$OUT/batches.tsv"
+  printf "%s\t%s\t%s\t%s\n" "${names[i]}" "${batch[${names[i]}]}" "${flags[i]}" "${seeds[${names[i]}]}" >> "$OUT/batches.tsv"
 done
 
 v2=$(awk -F'\t' '$1=="V2"{print $2}' "$OUT/batches.tsv")
@@ -98,6 +125,7 @@ v2=$(awk -F'\t' '$1=="V2"{print $2}' "$OUT/batches.tsv")
   echo "# Adaptive horde eval, $(date '+%Y-%m-%d %H:%M')"
   echo
   echo "Set $SET, $MINUTES game-minutes per run, $REPEATS repeats per variant (pooled), scene MLArena_Eval_V2, same eval player for every run."
+  echo "Bot senses: $bot_senses. Round r uses arena seed $SEED + 104729 × (r - 1) for every variant (the seeds column)."
   echo
   echo '```'
   cat "$OUT/batches.tsv"
@@ -106,7 +134,7 @@ v2=$(awk -F'\t' '$1=="V2"{print $2}' "$OUT/batches.tsv")
   echo "## New metrics (adaptive_metrics.py)"
   echo
   python3 MLTraining/analysis/adaptive_metrics.py --markdown "$OUT/batches.tsv"
-  tail -n +3 "$OUT/batches.tsv" | while IFS=$'\t' read -r name batch flag; do
+  tail -n +3 "$OUT/batches.tsv" | while IFS=$'\t' read -r name batch flag seed_list; do
     echo
     echo "## arena-report: V2 vs $name"
     echo

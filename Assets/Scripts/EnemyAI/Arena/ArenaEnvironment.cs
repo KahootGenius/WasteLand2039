@@ -216,7 +216,8 @@ public class ArenaEnvironment : MonoBehaviour
                 .Add("control", HumanControl ? "human" : "bot")
                 .Add("commander", spawner.Commander != null ? spawner.Commander.DisplayName : "")
                 .Add("curriculum_level", ArenaCurriculum.Level)
-                .Add("routes_shuffled", shuffleRoutes);
+                .Add("routes_shuffled", shuffleRoutes)
+                .Add("arena_seed", seed); // 本训练场的种子（ArenaManager：seed + 7919 × 序号）：配对的运行应该相同
             if (currentParams != null)
             {
                 currentParams.AddTo(line);

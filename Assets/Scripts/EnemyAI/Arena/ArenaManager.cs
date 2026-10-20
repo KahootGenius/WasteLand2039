@@ -10,6 +10,9 @@ using UnityEngine;
 /// 命令行（独立运行的玩家程序，例如无图形评估）：
 ///   -arenaScene 场景名    先切换到该场景（一个评估程序包含多个场景时使用）
 ///   -arenaMinutes N      运行 N 分钟游戏时间后退出（评估运行有固定长度）
+///   -arenaSeed N         随机数种子，代替 Inspector 的 seed：第 i 个训练场的机器人用 N + 7919 × i（每回合的性格参数、路线选择），
+///                        UnityEngine.Random（生成位置等）也从 N 开始。评估时每一轮用自己的种子、同一轮的各个版本用同一个
+///                        （MLTraining/eval_adaptive.sh），配对的两次运行可比，各轮之间相互独立
 ///   -stochastic          RL 指挥官按策略概率采样动作（默认取最可能的动作；训练早期策略接近均匀分布时，
 ///                        确定性推理会退化成单一动作，不能代表训练中的表现）。须在实例化训练场之前设置：
 ///                        ML-Agents 按模型缓存推理器（Academy.GetOrCreateModelRunner 不区分确定性），
@@ -85,6 +88,13 @@ public class ArenaManager : MonoBehaviour
         if (float.TryParse(CommandLineValue("-arenaMinutes"), System.Globalization.NumberStyles.Float,
                 System.Globalization.CultureInfo.InvariantCulture, out float minutes))
             runForGameMinutes = minutes;
+        if (int.TryParse(CommandLineValue("-arenaSeed"), System.Globalization.NumberStyles.Integer,
+                System.Globalization.CultureInfo.InvariantCulture, out int arenaSeed))
+        {
+            seed = arenaSeed;
+            Random.InitState(arenaSeed); // 在实例化训练场之前：生成位置等也由种子决定
+            Debug.Log($"[ArenaManager] -arenaSeed {arenaSeed}：第 i 个训练场的机器人种子 = {arenaSeed} + 7919 × i，UnityEngine.Random 也从 {arenaSeed} 开始");
+        }
 
         if (arenaPrefab == null)
         {
