@@ -14,6 +14,8 @@ using UnityEngine;
 ///                        确定性推理会退化成单一动作，不能代表训练中的表现）。须在实例化训练场之前设置：
 ///                        ML-Agents 按模型缓存推理器（Academy.GetOrCreateModelRunner 不区分确定性），
 ///                        之后再改 BehaviorParameters.DeterministicInference 不起作用
+///   -botLegacySenses     机器人改用 2026-10-20 之前的感知（看得到训练场里所有敌人，逃跑途中路线一侧的敌人都算被拦截），
+///                        复现之前的评估用；默认与真人玩家相当（BotSenses.PlayerLike）
 /// </summary>
 public class ArenaManager : MonoBehaviour
 {
@@ -92,6 +94,7 @@ public class ArenaManager : MonoBehaviour
         }
 
         bool stochastic = HasCommandLineFlag("-stochastic");
+        bool legacyBotSenses = HasCommandLineFlag("-botLegacySenses");
         var prefabBehaviors = arenaPrefab.GetComponentsInChildren<Unity.MLAgents.Policies.BehaviorParameters>(true);
         var deterministic = new bool[prefabBehaviors.Length];
         for (int i = 0; i < prefabBehaviors.Length; i++)
@@ -111,8 +114,12 @@ public class ArenaManager : MonoBehaviour
                 arena.SetPersonaPool(personaPool, shuffleRoutes);
             arena.SetTelemetry(telemetry);
             arena.SetWavesPerEpisode(wavesPerEpisode);
+            if (legacyBotSenses)
+                arena.SetLegacyBotSenses(true);
             arenas.Add(arena);
         }
+        if (legacyBotSenses)
+            Debug.Log("[ArenaManager] -botLegacySenses：机器人使用 2026-10-20 之前的感知（看得到所有敌人）");
 
         // 在实例化之后恢复预制体（实例已复制该设置；推理器按模型缓存，第一个实例决定采样方式）
         for (int i = 0; i < prefabBehaviors.Length; i++)

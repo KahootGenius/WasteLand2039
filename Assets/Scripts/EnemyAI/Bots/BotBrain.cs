@@ -42,7 +42,7 @@ public struct BotObservation
     public bool IsReloading;
     public int Ammo;
     public int MagazineSize;
-    /// <summary>存活的移动敌人位置</summary>
+    /// <summary>存活的移动敌人位置（训练场里的全部；BotBrain 按 BotArenaLayout.Senses 只使用镜头里的）</summary>
     public IReadOnlyList<Vector2> Enemies;
 }
 
@@ -64,6 +64,41 @@ public class BotRoute
     public Vector2 Refuge;
 }
 
+/// <summary>
+/// 机器人能感知什么、什么算"在路线上被拦截"（BotArenaLayout.Senses）。
+/// PlayerLike（默认，2026-10-20 起）：与真人玩家能得到的信息相当——
+///   - 只看得到镜头里的敌人：以镜头中心为中心的矩形，MainGame 的镜头（正交大小 5，1920×1080）= 半宽 8.89、半高 5。
+///     镜头像 CameraController 一样平滑地跟随玩家（smoothSpeed 5，全速跑动时落后玩家约 1 个单位），新一波开始时对准玩家；
+///   - 只有正在沿路线跑（上一步朝避难点方向移动）或已经到达避难点时被拦截，才算在这条路线上被拦截（路线权重 × ambushPenalty）。
+///     被堵住、改往别处躲开的途中，从路线那一侧追上来的敌人和受到的伤害都不再算到这条没跑上的路线上。
+/// Legacy：2026-10-20 之前的机器人（看得到训练场里的所有敌人；逃跑途中任何时候受到伤害、或路线那一侧 4 以内有敌人都算被拦截），
+///   用于复现之前的评估（ArenaManager 命令行 -botLegacySenses）。
+/// 两者选路线时都不看敌人，只按路线偏好抽。
+/// </summary>
+public struct BotSenses
+{
+    /// <summary>镜头的半宽、半高；任一为 0 = 看得到所有敌人</summary>
+    public Vector2 ViewHalfExtents;
+    /// <summary>镜头跟随玩家的平滑速度（CameraController.smoothSpeed）；0 = 镜头始终以玩家为中心</summary>
+    public float CameraSmoothSpeed;
+    /// <summary>true = 只有沿路线跑（或已到达避难点）时被拦截才算在这条路线上被拦截</summary>
+    public bool CatchOnlyOnRoute;
+
+    public bool LimitedView => ViewHalfExtents.x > 0f && ViewHalfExtents.y > 0f;
+
+    public static BotSenses PlayerLike => new BotSenses
+    {
+        ViewHalfExtents = new Vector2(5f * 1920f / 1080f, 5f),
+        CameraSmoothSpeed = 5f,
+        CatchOnlyOnRoute = true
+    };
+
+    public static BotSenses Legacy => new BotSenses();
+
+    /// <summary>遥测中的名字：player_like / legacy / custom</summary>
+    public string Name => LimitedView && CatchOnlyOnRoute ? "player_like" : !LimitedView && !CatchOnlyOnRoute ? "legacy" : "custom";
+}
+
 /// <summary>机器人对训练场的了解（世界坐标）</summary>
 public class BotArenaLayout
 {
@@ -74,6 +109,8 @@ public class BotArenaLayout
     /// <summary>离基地超过此距离时往回走（训练场边界）</summary>
     public float BoundsRadius = 38f;
     public readonly List<BotRoute> Routes = new List<BotRoute>();
+    /// <summary>感知：视野、什么算在路线上被拦截（默认与真人玩家相当，见 BotSenses）</summary>
+    public BotSenses Senses = BotSenses.PlayerLike;
 }
 
 /// <summary>一次交战决定（写入遥测，作为评估玩家画像的"真实标签"）</summary>
@@ -92,7 +129,8 @@ public struct BotDecision
 /// <summary>
 /// 脚本机器人玩家的决策（纯逻辑，不依赖场景，可在 Unity 外测试）。
 /// 每次交战前按性格参数选定方式（作战 / 逃跑 / 风筝）和路线；敌人靠近后经过反应时间执行；
-/// 安全后停留一会再回基地待命。与真人一样：移动中不能开火，开火需要先停下。
+/// 安全后停留一会再回基地待命。与真人一样：移动中不能开火，开火需要先停下；
+/// 默认只看得到镜头里的敌人，只有沿路线跑时被拦截才避开这条路线（Layout.Senses，见 BotSenses）。
 /// </summary>
 public class BotBrain
 {
@@ -123,8 +161,10 @@ public class BotBrain
     public int Ambushes { get; private set; }
     /// <summary>最近一次被拦截的原因（Ambushed 触发时有效）</summary>
     public AmbushCause LastAmbushCause { get; private set; }
-    /// <summary>最近一次被拦截时触发它的敌人在本步观测 Enemies 中的下标；受到伤害时为 -1（不知道是谁）</summary>
+    /// <summary>最近一次被拦截时触发它的敌人在本步观测 Enemies 中的下标（传入的全部敌人中的下标）；受到伤害时为 -1（不知道是谁）</summary>
     public int LastAmbushEnemyIndex { get; private set; } = -1;
+    /// <summary>机器人的镜头中心（Senses 平滑跟随玩家；不平滑时就是玩家位置）</summary>
+    public Vector2 ViewCenter => viewCenter;
 
     /// <summary>做出一次交战决定</summary>
     public event Action<BotDecision> Decided;
@@ -148,6 +188,16 @@ public class BotBrain
     private float escapeStartTime;
     private bool escapeAmbushed;
     private Vector2 lastAim = Vector2.right;
+    /// <summary>上一步的移动方向（判断是否正沿路线朝避难点跑）</summary>
+    private Vector2 lastMove;
+
+    // 视野（Layout.Senses）：镜头中心，本步看得到的敌人和它们在观测 Enemies 中的下标
+    private readonly List<Vector2> visibleEnemies = new List<Vector2>();
+    private readonly List<int> visibleIndex = new List<int>();
+    private Vector2 viewCenter;
+    private bool viewCenterSet;
+    private float lastStepTime;
+    private bool viewFiltered;
 
     public BotBrain(BotParams parameters, BotArenaLayout layout, System.Random random)
     {
@@ -178,12 +228,15 @@ public class BotBrain
         safeSince = -1f;
         kiteRetreating = false;
         lastHealth = -1f;
+        lastMove = Vector2.zero;
+        viewCenterSet = false; // 镜头对准回到待命位置的玩家
         NearestEnemyDistance = float.PositiveInfinity;
         Intent = ChooseIntent();
     }
 
     public BotCommand Step(BotObservation o)
     {
+        o = See(o);
         float time = o.Time;
         bool damaged = lastHealth >= 0f && o.Health < lastHealth - 0.01f;
         lastHealth = o.Health;
@@ -292,7 +345,40 @@ public class BotBrain
 
         command.Move = Params.EightWayMovement ? QuantizeEightWay(move) : move;
         command.Aim = aim;
+        lastMove = command.Move;
         return command;
+    }
+
+    /// <summary>
+    /// 机器人看到的观测：Layout.Senses 限制视野时只保留镜头里的敌人（镜头像 CameraController 一样，
+    /// 每步按 smoothSpeed × 时间差向玩家插值；第一步和新一波开始时对准玩家）
+    /// </summary>
+    private BotObservation See(BotObservation o)
+    {
+        BotSenses senses = Layout.Senses;
+        if (!viewCenterSet || senses.CameraSmoothSpeed <= 0f)
+            viewCenter = o.Position;
+        else
+            viewCenter = Vector2.Lerp(viewCenter, o.Position, senses.CameraSmoothSpeed * Mathf.Max(0f, o.Time - lastStepTime));
+        viewCenterSet = true;
+        lastStepTime = o.Time;
+
+        viewFiltered = senses.LimitedView && o.Enemies != null;
+        if (!viewFiltered)
+            return o;
+        visibleEnemies.Clear();
+        visibleIndex.Clear();
+        for (int i = 0; i < o.Enemies.Count; i++)
+        {
+            Vector2 offset = o.Enemies[i] - viewCenter;
+            if (Mathf.Abs(offset.x) <= senses.ViewHalfExtents.x && Mathf.Abs(offset.y) <= senses.ViewHalfExtents.y)
+            {
+                visibleEnemies.Add(o.Enemies[i]);
+                visibleIndex.Add(i);
+            }
+        }
+        o.Enemies = visibleEnemies;
+        return o;
     }
 
     /// <summary>当前状态的单行描述（调试面板）</summary>
@@ -399,12 +485,18 @@ public class BotBrain
     }
 
     /// <summary>
-    /// 逃跑途中被拦截（起跑 AmbushGraceSeconds 秒之后）：受到伤害，或路线前方近处出现敌人，
-    /// 或到达避难点时附近已有敌人
+    /// 逃跑途中在路线上被拦截（起跑 AmbushGraceSeconds 秒之后）：受到伤害，或路线前方近处出现敌人，
+    /// 或到达避难点时附近已有敌人。Senses.CatchOnlyOnRoute 时只在沿路线跑（上一步朝避难点移动）或已到达避难点时才算：
+    /// 被堵住、改往别处躲开的途中，从路线那一侧追上来的敌人和受到的伤害都不算到这条路线上
     /// </summary>
     private bool IsAmbushed(BotObservation o, float time, bool damaged)
     {
         if (time - escapeStartTime <= AmbushGraceSeconds)
+            return false;
+        Vector2 refuge = Route >= 0 ? Layout.Routes[Route].Refuge : o.Position;
+        Vector2 toRefuge = refuge - o.Position;
+        bool arrived = Route >= 0 && toRefuge.magnitude <= RefugeArriveRadius;
+        if (Layout.Senses.CatchOnlyOnRoute && !arrived && (Route < 0 || Vector2.Dot(lastMove, toRefuge) <= 0f))
             return false;
         if (damaged)
         {
@@ -415,9 +507,6 @@ public class BotBrain
         if (Route < 0 || o.Enemies == null)
             return false;
 
-        Vector2 refuge = Layout.Routes[Route].Refuge;
-        Vector2 toRefuge = refuge - o.Position;
-        bool arrived = toRefuge.magnitude <= RefugeArriveRadius;
         for (int i = 0; i < o.Enemies.Count; i++)
         {
             Vector2 toEnemy = o.Enemies[i] - o.Position;
@@ -425,7 +514,7 @@ public class BotBrain
                         : toEnemy.magnitude <= AmbushDistance && Vector2.Dot(toEnemy, toRefuge) > 0f)
             {
                 LastAmbushCause = arrived ? AmbushCause.AtRefuge : AmbushCause.AheadOnRoute;
-                LastAmbushEnemyIndex = i;
+                LastAmbushEnemyIndex = viewFiltered ? visibleIndex[i] : i;
                 return true;
             }
         }

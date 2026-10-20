@@ -7,6 +7,8 @@
 // animation locks movement, 5 shots/s, 30-round magazine, 2 s reload, 20 dmg/shot; zombies 3 u/s,
 // 100 HP, chase within 5 units, otherwise walk to the base; waves of 20 zombies, max 5 alive, one
 // every 2 s in a 5-15 ring around the player, 90 s limit.
+// The bots use their default senses (BotSenses.PlayerLike since 2026-10-20: only what MainGame's camera shows);
+// the Phase 3 checks that the narrower view changes also run with BotSenses.Legacy, the bot they were written for.
 
 using System;
 using System.Collections.Generic;
@@ -28,6 +30,9 @@ static partial class LogicTests
         var random = RunPersona("Random", BotPersonaPresets.RandomPlayer(), 15);
         var runnerAmbushed = RunPersona("RunnerA, ambushed at A", BotPersonaPresets.RunnerA(), 16, ambushRoute: 0);
         var adaptiveAmbushed = RunPersona("Adaptive, ambushed at A", BotPersonaPresets.Adaptive(), 16, ambushRoute: 0);
+        var fighterLegacy = RunPersona("Fighter, legacy", BotPersonaPresets.Fighter(), 11, senses: BotSenses.Legacy);
+        var runnerAmbushedLegacy = RunPersona("RunnerA amb. A, legacy", BotPersonaPresets.RunnerA(), 16, ambushRoute: 0, senses: BotSenses.Legacy);
+        var adaptiveAmbushedLegacy = RunPersona("Adaptive amb. A, legacy", BotPersonaPresets.Adaptive(), 16, ambushRoute: 0, senses: BotSenses.Legacy);
         Console.WriteLine("    label breakdown, RunnerA:");
         PrintLabelBreakdown(runner);
         Console.WriteLine("    label breakdown, Kiter:");
@@ -35,7 +40,12 @@ static partial class LogicTests
 
         Console.WriteLine("Checks: Fighter");
         Check(fighter.Decisions.Count > 0 && fighter.Decisions.All(d => d.Mode == BotMode.Fight), "all decisions Fight", $"({fighter.Decisions.Count})");
-        Check(fighter.Profile.FightShare > 0.6f, "Fight share > 60%", $"= {Pct(fighter.Profile.FightShare)}");
+        // MainGame's camera is 10 units tall: from its post at home (0, -4.5) the fighter can't see the zombies gathered on the
+        // far side of the base, so it doesn't shoot them, and the tracker (which sees every zombie) calls those seconds Passive
+        Check(fighter.Profile.FightShare > 0.2f && fighter.Profile.FightShare > fighter.Profile.FleeShare + fighter.Profile.KiteShare,
+            "Fight share > 20% and above Flee + Kite (player-like view)",
+            $"= {Pct(fighter.Profile.FightShare)}, Passive {Pct(fighter.Profile.PassiveShare)}");
+        Check(fighterLegacy.Profile.FightShare > 0.6f, "legacy senses (sees every zombie): Fight share > 60%", $"= {Pct(fighterLegacy.Profile.FightShare)}");
         Check(fighter.Profile.FleeShare < 0.15f, "Flee share < 15%", $"= {Pct(fighter.Profile.FleeShare)}");
         Check(fighter.Kills >= 20, "kills zombies", $"= {fighter.Kills}");
 
@@ -95,9 +105,13 @@ static partial class LogicTests
         Check(laterA < 0.5f, "Adaptive mostly avoids A later", $"(A = {Pct(laterA)} of the last {laterHalf.Count} flees)");
         Check(adaptiveAmbushed.MinWeightA < 0.3f, "Adaptive's weight on A dropped after ambushes",
             $"(min {adaptiveAmbushed.MinWeightA:F2}, started {adaptiveAmbushed.Brain.Params.RouteWeights[0]:F2}, end {adaptiveAmbushed.Brain.RouteWeights[0]:F2})");
-        float runnerEast = EastSideEscapeShare(runnerAmbushed), adaptiveEast = EastSideEscapeShare(adaptiveAmbushed);
-        Check(adaptiveEast < runnerEast, "profile: Adaptive's escapes end on the east side less often than RunnerA's",
+        float runnerEast = EastSideEscapeShare(runnerAmbushedLegacy), adaptiveEast = EastSideEscapeShare(adaptiveAmbushedLegacy);
+        Check(adaptiveEast < runnerEast, "legacy senses: profile: Adaptive's escapes end on the east side less often than RunnerA's",
             $"({Pct(adaptiveEast)} vs {Pct(runnerEast)})");
+        // With the player-like view both bots see the zombies around them later and dodge more (zombies here spawn 5-15 from
+        // the player, much closer than in the real arena), so their escape ends say little about the route; reported, not checked
+        Console.WriteLine($"    player-like senses: escapes ending on the east side, Adaptive {Pct(EastSideEscapeShare(adaptiveAmbushed))} " +
+                          $"vs RunnerA {Pct(EastSideEscapeShare(runnerAmbushed))}");
 
         Console.WriteLine("Checks: Random");
         int modes = random.Decisions.Select(d => d.Mode).Distinct().Count();
@@ -158,9 +172,9 @@ static partial class LogicTests
         }
     }
 
-    static ArenaSim RunPersona(string label, BotPersonaSpec spec, int seed, int waves = 8, int? ambushRoute = null)
+    static ArenaSim RunPersona(string label, BotPersonaSpec spec, int seed, int waves = 8, int? ambushRoute = null, BotSenses? senses = null)
     {
-        var sim = new ArenaSim(spec, seed, ambushRoute);
+        var sim = new ArenaSim(spec, seed, ambushRoute, senses: senses);
         sim.RunWaves(waves);
         var p = sim.Profile;
         int fight = sim.Decisions.Count(d => d.Mode == BotMode.Fight);
@@ -213,10 +227,13 @@ static partial class LogicTests
         float health, time, reloadEnd = -1f, nextFire, lockUntil, sampleAccumulator, damageSinceSample;
         int ammo, shotsSinceSample;
 
-        public ArenaSim(BotPersonaSpec spec, int seed, int? ambushRoute, EngagementSettings settings = null)
+        /// <param name="senses">the bot's senses; null = the default (BotSenses.PlayerLike)</param>
+        public ArenaSim(BotPersonaSpec spec, int seed, int? ambushRoute, EngagementSettings settings = null, BotSenses? senses = null)
         {
             rng = new System.Random(seed);
             this.ambushRoute = ambushRoute;
+            if (senses.HasValue)
+                Layout.Senses = senses.Value;
             foreach (var (name, degrees) in new[] { ("A", 0f), ("B", 135f), ("C", 225f) })
             {
                 float rad = degrees * Mathf.Deg2Rad;

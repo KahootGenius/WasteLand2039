@@ -45,6 +45,9 @@ public class ArenaEnvironment : MonoBehaviour
     [Tooltip("机器人离基地超过此距离时往回走")]
     [SerializeField] private float boundsRadius = 38f;
     [SerializeField] private int seed = 1;
+    [Tooltip("机器人的感知（BotSenses）。关闭（默认，2026-10-20 起）= 与真人玩家相当：只看得到镜头里的敌人，只有沿路线跑时被拦截才避开这条路线。" +
+             "打开 = 此前的机器人（看得到所有敌人），复现之前的评估用；命令行 -botLegacySenses")]
+    [SerializeField] private bool legacyBotSenses = false;
 
     private System.Random rng;
     private bool humanControl;
@@ -66,6 +69,8 @@ public class ArenaEnvironment : MonoBehaviour
     public IReadOnlyList<ArenaRoute> Routes => routes;
     /// <summary>每回合开始时重置玩家画像（新的"玩家"）；指挥官据此重置自己学到的玩家模型</summary>
     public bool ResetsProfileEachEpisode => resetProfileEachEpisode;
+    /// <summary>机器人的感知：默认与真人玩家相当（BotSenses.PlayerLike），legacyBotSenses 时为此前的机器人</summary>
+    public BotSenses CurrentBotSenses => legacyBotSenses ? BotSenses.Legacy : BotSenses.PlayerLike;
 
     /// <summary>true = 机器人停用，由键盘鼠标操作（本回合剩余时间的数据标记为 human）</summary>
     public bool HumanControl
@@ -124,6 +129,12 @@ public class ArenaEnvironment : MonoBehaviour
             return;
         monitor.WriteTelemetry = mode != ArenaTelemetry.Off;
         monitor.WriteSamples = mode == ArenaTelemetry.Full;
+    }
+
+    /// <summary>机器人改用此前的感知（复现 2026-10-20 之前的评估，命令行 -botLegacySenses）。从下一回合起生效，应在 Start 之前调用</summary>
+    public void SetLegacyBotSenses(bool legacy)
+    {
+        legacyBotSenses = legacy;
     }
 
     private void Awake()
@@ -207,7 +218,13 @@ public class ArenaEnvironment : MonoBehaviour
                 .Add("curriculum_level", ArenaCurriculum.Level)
                 .Add("routes_shuffled", shuffleRoutes);
             if (currentParams != null)
+            {
                 currentParams.AddTo(line);
+                // 机器人的感知（2026-10-20 起）：player_like = 只看得到镜头里的敌人、只有沿路线跑时被拦截才算；legacy = 此前的机器人
+                BotSenses senses = CurrentBotSenses;
+                line.Add("bot_senses", senses.Name)
+                    .Add("bot_view", new List<float> { senses.ViewHalfExtents.x, senses.ViewHalfExtents.y });
+            }
             line.Write();
         }
     }
@@ -323,7 +340,8 @@ public class ArenaEnvironment : MonoBehaviour
         {
             Base = arenaBase != null ? (Vector2)arenaBase.transform.position : (Vector2)transform.position,
             Home = playerStart != null ? (Vector2)playerStart.position : (Vector2)transform.position,
-            BoundsRadius = boundsRadius
+            BoundsRadius = boundsRadius,
+            Senses = CurrentBotSenses
         };
         for (int i = 0; i < routes.Count; i++)
         {
