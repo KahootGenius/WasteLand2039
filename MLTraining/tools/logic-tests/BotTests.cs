@@ -6,7 +6,9 @@
 // Simulated rules mirror the game: player 5 u/s, can't fire while moving (|v| > 0.1), 0.42 s attack
 // animation locks movement, 5 shots/s, 30-round magazine, 2 s reload, 20 dmg/shot; zombies 3 u/s,
 // 100 HP, chase within 5 units, otherwise walk to the base; waves of 20 zombies, max 5 alive, one
-// every 2 s in a 5-15 ring around the player, 90 s limit.
+// every 2 s in a 5-15 ring around the player, 90 s limit. ArenaSim.InterceptZombies makes zombies chasing a running player head
+// for the point where they can meet the player instead (Interception.MeetingPoint, PredictiveCommander -v2Intercept;
+// InterceptionTests.cs).
 // The bots use their default senses (BotSenses.PlayerLike since 2026-10-20: only what MainGame's camera shows);
 // the Phase 3 checks that the narrower view changes also run with BotSenses.Legacy, the bot they were written for.
 
@@ -213,6 +215,12 @@ static partial class LogicTests
         public readonly List<BotDecision> Decisions = new List<BotDecision>();
         public readonly List<EscapeEpisode> Escapes = new List<EscapeEpisode>();
         public int Kills, Deaths, Ambushes, ValidEscapes;
+        public float DamageTaken;
+        /// <summary>zombies chasing a running player (PlayerMotion.Running: moving for 1 s or more) head for the meeting point
+        /// (Interception.MeetingPoint, like Enemy.InterceptPlayer) instead of the player; within 2.5 they go straight at the
+        /// player. Off = the original arena</summary>
+        public bool InterceptZombies;
+        readonly PlayerMotion motion = new PlayerMotion();
         public readonly List<(AmbushCause cause, int index)> AmbushCauses = new List<(AmbushCause, int)>();
         public float MinWeightA = 1f;
         /// <summary>engaged seconds by (what the bot was doing, what the tracker labeled it)</summary>
@@ -265,6 +273,7 @@ static partial class LogicTests
         {
             player = Layout.Home;
             velocity = Vector2.zero;
+            motion.Reset();
             health = 100f;
             ammo = Magazine;
             reloadEnd = -1f;
@@ -324,13 +333,19 @@ static partial class LogicTests
 
             velocity = time < lockUntil || command.Move.sqrMagnitude < 0.0001f ? Vector2.zero : command.Move.normalized * PlayerSpeed;
             player += velocity * Dt;
+            motion.Observe(time, player, velocity); // like Enemy.Interception.cs
 
             foreach (Zombie z in zombies)
             {
                 float toPlayer = Vector2.Distance(z.Pos, player);
                 Vector2 target;
                 float stop;
-                if (toPlayer <= Detection) { target = player; stop = Contact; }
+                if (toPlayer <= Detection && InterceptZombies && motion.Running && toPlayer > Contact + 0.5f)
+                {
+                    target = Interception.MeetingPoint(z.Pos, ZombieSpeed, player, motion.Velocity);
+                    stop = 0.05f;
+                }
+                else if (toPlayer <= Detection) { target = player; stop = Contact; }
                 else if (z.Post.HasValue) { target = z.Post.Value; stop = 0.2f; }
                 else { target = Vector2.zero; stop = BaseStop; }
 
@@ -343,6 +358,7 @@ static partial class LogicTests
                 {
                     health -= ZombieDamage;
                     damageSinceSample += ZombieDamage;
+                    DamageTaken += ZombieDamage;
                     z.NextAttack = time + ZombieAttackCooldown;
                 }
             }

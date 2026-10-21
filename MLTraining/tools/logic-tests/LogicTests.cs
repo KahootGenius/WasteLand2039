@@ -28,6 +28,7 @@ static partial class LogicTests
         TelemetryFormatTest();
         BotTests();
         BotSensesTests();
+        InterceptionTests();
         CommanderLearningTests();
         ProfilePersistenceTests();
         PredictionTests();

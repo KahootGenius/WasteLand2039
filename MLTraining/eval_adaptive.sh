@@ -2,12 +2,13 @@
 # Adaptive horde experiments (build guide §3): run every variant of the V2 commander on the SAME eval
 # player, so the only difference between batches is the command-line flag, then compare each with plain V2.
 #
-# Usage: MLTraining/eval_adaptive.sh [GAME_MINUTES] [--set adaptive|reaction|all] [--ablations] [--repeats N]
+# Usage: MLTraining/eval_adaptive.sh [GAME_MINUTES] [--set adaptive|reaction|all|intercept] [--ablations] [--repeats N]
 #                                    [--seed N] [--legacy-bot] [--reference BATCH]
 #   GAME_MINUTES  per run, default 40
 #   --set         which variants: adaptive (default, layer 1: Thompson direction, ambush bandit), reaction (layer 2:
-#                 V2, Reaction = -v2Reaction, Reaction-p0.8 = the same with P(no reaction) 0.8 a priori), or all
-#                 (every commander so far: V2, TS, Bandit, TS+Bandit, Reaction; e.g. to re-measure them after the bot changed)
+#                 V2, Reaction = -v2Reaction, Reaction-p0.8 = the same with P(no reaction) 0.8 a priori), all
+#                 (every commander so far: V2, TS, Bandit, TS+Bandit, Reaction; e.g. to re-measure them after the bot changed),
+#                 or intercept (V2, Intercept = -v2Intercept: chasing zombies head for where they can meet the player)
 #   --ablations   also run the bandit ablations (set adaptive; see below)
 #   --repeats N   batches per variant, default 2: the repeats are pooled, and their spread is the run-to-run noise
 #   --seed N      round r uses arena seed N + 104729 × (r - 1) for every variant (-arenaSeed, see ArenaManager), default
@@ -80,7 +81,10 @@ case $SET in
   all)
     names=(V2 TS Bandit TS+Bandit Reaction)
     flags=("" "-v2Thompson" "-v2Bandit" "-v2Thompson -v2Bandit" "-v2Reaction") ;;
-  *) echo "unknown --set $SET (adaptive, reaction or all)" >&2; exit 2 ;;
+  intercept)
+    names=(V2 Intercept)
+    flags=("" "-v2Intercept") ;;
+  *) echo "unknown --set $SET (adaptive, reaction, all or intercept)" >&2; exit 2 ;;
 esac
 
 typeset -A batch seeds

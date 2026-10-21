@@ -356,7 +356,7 @@ public partial class Enemy : MonoBehaviour, IDamageable // 命令扩展见 Enemy
         {
             if (isPlayerInRange)
             {
-                currentTarget = player.position;
+                currentTarget = ChasePoint(); // 玩家的位置；截击时为相遇点（Enemy.Interception.cs）
                 hasTarget = true;
                 targetingMainBase = false; // 停止攻击基地
                 
@@ -391,7 +391,7 @@ public partial class Enemy : MonoBehaviour, IDamageable // 命令扩展见 Enemy
         // 如果玩家在范围内，持续更新目标位置
         if (isPlayerInRange)
         {
-            currentTarget = player.position;
+            currentTarget = ChasePoint();
             hasTarget = true;
         }
     }
@@ -469,7 +469,7 @@ public partial class Enemy : MonoBehaviour, IDamageable // 命令扩展见 Enemy
                 // 确定目标位置（玩家优先）
                 if (isPlayerInRange && player != null)
                 {
-                    targetPosition = player.position;
+                    targetPosition = ChasePoint(); // 截击时为相遇点（Enemy.Interception.cs）
                 }
                 else if (TryGetOrderDestination(out Vector2 orderDestination))
                 {
@@ -964,7 +964,7 @@ public partial class Enemy : MonoBehaviour, IDamageable // 命令扩展见 Enemy
         isAlerted = true;
         currentPropagationLevel = propagationLevel;
         hasTarget = true;
-        currentTarget = player.position;
+        currentTarget = ChasePoint(); // 截击时为相遇点（Enemy.Interception.cs）
         
         VerboseLog.Log($"{gameObject.name} 加入集群追击，传播层级: {propagationLevel}");
         

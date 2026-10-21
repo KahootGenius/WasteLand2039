@@ -44,6 +44,11 @@ using UnityEngine;
 /// - 跨会话保存（Bandit 模式，且玩家画像也跨会话保存时）：第一波开始时读取 AmbushBanditStore，
 ///   每波结束、游戏暂停和退出时写入。游戏场景用 EnemyAISettings.v2Thompson / v2Bandit 选择模式（EnemyAIBootstrap）。
 ///
+/// 截击（interceptChase / -v2Intercept，默认关闭）：追击玩家的僵尸（压迫小队、被触发的伏击者，即所有敌人）朝与玩家的
+/// 相遇点走（Enemy.InterceptPlayer、Interception.MeetingPoint），而不是追玩家当前的位置。僵尸比奔跑的玩家慢，从后面追
+/// 永远追不上；在玩家前方或侧面的僵尸朝相遇点走就能截住他。只截击正在跑的玩家（连续移动至少 1 秒，PlayerMotion）：
+/// 走走停停的玩家（风筝、站着打）按速度提前截会让僵尸冲过头，照常直接追。与上面的伏击规则无关，可以和任何模式一起用。
+///
 /// 遥测（经 PlayerBehaviourMonitor）：commander_order（与 RLCommander 格式相同），每次逃跑开始时的 prediction，
 /// 每次有效逃跑结算时（结束后的观察期满）的 ambush_trial（伏击 / 压迫小队是否接触，所有模式），老虎机每次更新的 bandit_update。
 ///
@@ -51,6 +56,7 @@ using UnityEngine;
 ///   -v2Predictor Frequency|Learned   -v2From Base|PlayerZone   -v2React
 ///   -v2Thompson   -v2Bandit   -v2BanditShared   -v2BanditKeep（不按回合重置）   -v2Gamma 0.9   -v2Seed N
 ///   -v2ContactRadius 6   -v2ContactTail 5   -v2BanditJoint   -v2RedrawEveryEscape   -v2Reaction   -v2ReactionPrior 0.5
+///   -v2Intercept
 /// </summary>
 public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisodeListener
 {
@@ -171,6 +177,11 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
     [Tooltip("离基地至少这么远才算一次出行（否则只是在基地附近躲闪）。训练场的避难点离基地 26")]
     [SerializeField] private float outingMinDistance = 15f;
 
+    [Header("截击（默认关闭）")]
+    [Tooltip("追击正在跑的玩家（连续移动至少 1 秒）的僵尸朝与玩家的相遇点走（Enemy.InterceptPlayer），而不是追玩家当前的位置：" +
+             "僵尸比玩家慢，只有在玩家前方或侧面才截得住逃跑的玩家")]
+    [SerializeField] private bool interceptChase = false;
+
     public string DisplayName
     {
         get
@@ -200,6 +211,8 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
                 if (Mathf.Abs(reactionPriorNoReaction - ReactionModel.DefaultPriorNoReaction) > 1e-4f)
                     name += "-p" + reactionPriorNoReaction.ToString("0.##", CultureInfo.InvariantCulture);
             }
+            if (interceptChase)
+                name += "+Intercept";
             return name;
         }
     }
@@ -414,6 +427,8 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
                 playerReactionModel = true;
             else if (args[i] == "-v2ReactionPrior" && float.TryParse(next, NumberStyles.Float, CultureInfo.InvariantCulture, out float prior))
                 reactionPriorNoReaction = Mathf.Clamp(prior, 0.01f, 0.99f);
+            else if (args[i] == "-v2Intercept")
+                interceptChase = true;
         }
     }
 
@@ -522,6 +537,7 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
 
     public void OnEnemySpawned(HordeContext waveContext, Enemy enemy)
     {
+        enemy.InterceptPlayer = interceptChase;
         if (pendingSpawnSite >= 0)
             sites[pendingSpawnSite].Squad.Add(enemy);
         else
