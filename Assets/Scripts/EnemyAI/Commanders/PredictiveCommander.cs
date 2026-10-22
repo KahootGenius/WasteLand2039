@@ -49,6 +49,14 @@ using UnityEngine;
 /// 永远追不上；在玩家前方或侧面的僵尸朝相遇点走就能截住他。只截击正在跑的玩家（连续移动至少 1 秒，PlayerMotion）：
 /// 走走停停的玩家（风筝、站着打）按速度提前截会让僵尸冲过头，照常直接追。与上面的伏击规则无关，可以和任何模式一起用。
 ///
+/// 按玩家风格分配（styleAware / -v2Style，默认关闭；只用于 V2 的 Argmax + FixedRing）：伏击人数按画像中的逃跑占比
+/// （PlayerProfile.FleeShare，HordeStyle）决定。多半在跑的玩家（占比 ≥ runnerFleeShare）：避难点一带伏击
+/// runnerAmbushSize 个（V2 是 ambushSize = 2），分兵规则与 V2 相同。多半在打的玩家：不在避难点伏击，只派 gateSize 个
+/// 守关口——预测的逃跑方向上离基地中心 gateDistance 的地方（离开基地的路上），其余都在基地附近施压。
+/// 方向、证据门槛、换位门槛、重新预测都与 V2 相同；关口是第三个伏击点（sites[GateSite]），同样 HoldAt、同样生成和调人。
+/// 模拟训练场（MLTraining/tools/arena-sim）中比 V2 每波多约 5 伤害（8 个训练场的平均），没有哪个性格变少；
+/// 多出的伤害大多在离开基地的路上（关口）和避难点外（多一个伏击者）。
+///
 /// 遥测（经 PlayerBehaviourMonitor）：commander_order（与 RLCommander 格式相同），每次逃跑开始时的 prediction，
 /// 每次有效逃跑结算时（结束后的观察期满）的 ambush_trial（伏击 / 压迫小队是否接触，所有模式），老虎机每次更新的 bandit_update。
 ///
@@ -56,7 +64,7 @@ using UnityEngine;
 ///   -v2Predictor Frequency|Learned   -v2From Base|PlayerZone   -v2React
 ///   -v2Thompson   -v2Bandit   -v2BanditShared   -v2BanditKeep（不按回合重置）   -v2Gamma 0.9   -v2Seed N
 ///   -v2ContactRadius 6   -v2ContactTail 5   -v2BanditJoint   -v2RedrawEveryEscape   -v2Reaction   -v2ReactionPrior 0.5
-///   -v2Intercept
+///   -v2Intercept   -v2Style   -v2StyleShare 0.42
 /// </summary>
 public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisodeListener
 {
@@ -100,7 +108,9 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
         Bandit
     }
 
-    private const int MaxAmbushSites = 2;
+    /// <summary>两个伏击点（主方向、分兵）和按玩家风格分配时的关口</summary>
+    private const int MaxAmbushSites = 3;
+    private const int GateSite = 2;
     /// <summary>FrequencyPredictor 的 routePrior（默认值）：狄利克雷参数 = P × (证据 + 此值)</summary>
     private const float FrequencyRoutePrior = 2f;
 
@@ -182,6 +192,19 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
              "僵尸比玩家慢，只有在玩家前方或侧面才截得住逃跑的玩家")]
     [SerializeField] private bool interceptChase = false;
 
+    [Header("按玩家风格分配（默认关闭）")]
+    [Tooltip("按画像中的逃跑占比分配：多半在跑的玩家在避难点一带多伏击几个，多半在打的玩家不远伏、只守离开基地的路上的关口（HordeStyle）。" +
+             "只用于 V2（Argmax + FixedRing）")]
+    [SerializeField] private bool styleAware = false;
+    [Tooltip("逃跑占（衰减加权的）交战时间至少这么多 = 多半在跑")]
+    [SerializeField, Range(0f, 1f)] private float runnerFleeShare = HordeStyle.DefaultRunnerFleeShare;
+    [Tooltip("多半在跑的玩家：避难点一带的伏击人数（代替 ambushSize）")]
+    [SerializeField, Min(0)] private int runnerAmbushSize = HordeStyle.DefaultRunnerAmbushSize;
+    [Tooltip("多半在打的玩家：关口人数")]
+    [SerializeField, Min(0)] private int gateSize = HordeStyle.DefaultGateSize;
+    [Tooltip("关口离基地中心的距离（预测的逃跑方向上）")]
+    [SerializeField] private float gateDistance = HordeStyle.DefaultGateDistance;
+
     public string DisplayName
     {
         get
@@ -213,6 +236,12 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
             }
             if (interceptChase)
                 name += "+Intercept";
+            if (UsesStyle)
+            {
+                name += "+Style";
+                if (Mathf.Abs(runnerFleeShare - HordeStyle.DefaultRunnerFleeShare) > 1e-4f)
+                    name += "-s" + runnerFleeShare.ToString("0.##", CultureInfo.InvariantCulture);
+            }
             return name;
         }
     }
@@ -382,6 +411,13 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
     /// <summary>反应模型调整预测（只用于从基地预测）</summary>
     private bool UsesReaction => playerReactionModel && predictFrom == PredictionOrigin.Base;
 
+    /// <summary>按玩家风格分配（只用于 V2 的 Argmax + FixedRing）</summary>
+    private bool UsesStyle => styleAware && !UsesSampling;
+
+    /// <summary>本次 Replan 的伏击人数（避难点一带）和关口人数；不按风格分配时 = ambushSize 和 0</summary>
+    private int activeAmbushSize;
+    private int activeGateSize;
+
     private void Awake()
     {
         ApplyCommandLine();
@@ -389,6 +425,10 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
         CreateSampling();
         monitor = GetComponent<PlayerBehaviourMonitor>();
         ResetSquads();
+        activeAmbushSize = ambushSize;
+        activeGateSize = 0;
+        if (styleAware && UsesSampling)
+            Debug.LogWarning("[PredictiveCommander] 按玩家风格分配只用于 V2（Argmax + FixedRing），Thompson / Bandit 模式下不使用", this);
     }
 
     private void ApplyCommandLine()
@@ -429,6 +469,10 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
                 reactionPriorNoReaction = Mathf.Clamp(prior, 0.01f, 0.99f);
             else if (args[i] == "-v2Intercept")
                 interceptChase = true;
+            else if (args[i] == "-v2Style")
+                styleAware = true;
+            else if (args[i] == "-v2StyleShare" && float.TryParse(next, NumberStyles.Float, CultureInfo.InvariantCulture, out float share))
+                runnerFleeShare = Mathf.Clamp01(share);
         }
     }
 
@@ -610,15 +654,23 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
         if (!Predict())
         {
             SetSites(-1, -1);
+            SetGate(-1);
             return;
         }
 
-        if (context.Profile.EscapeEvidence < minEvidence || ambushSize <= 0)
+        // 伏击 / 关口人数：按玩家风格分配时由画像中的逃跑占比决定，否则 = V2
+        if (UsesStyle)
+            (activeAmbushSize, activeGateSize) = HordeStyle.Allocate(context.Profile.FleeShare, runnerFleeShare, runnerAmbushSize, gateSize);
+        else
+            (activeAmbushSize, activeGateSize) = (ambushSize, 0);
+
+        if (context.Profile.EscapeEvidence < minEvidence || activeAmbushSize + activeGateSize <= 0)
         {
             // 对这个玩家还一无所知（新回合 / 新画像）：与基准相同（所有模式都保留这个门槛）
             confident = false;
             drawnDirection = -1;
             SetSites(-1, -1);
+            SetGate(-1);
             return;
         }
 
@@ -666,6 +718,7 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
             return;
         }
         SetSites(primary, secondary);
+        SetGate(primary);
     }
 
     /// <summary>
@@ -697,11 +750,11 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
         return bandit.ChooseDistance(sector);
     }
 
-    /// <summary>第二个伏击方向：与 primary 不相邻、概率 ≥ primary 的 splitRatio 倍中最大的；没有（或 ambushSize &lt; 2）时 -1</summary>
+    /// <summary>第二个伏击方向：与 primary 不相邻、概率 ≥ primary 的 splitRatio 倍中最大的；没有（或伏击人数 &lt; 2）时 -1</summary>
     private int SecondarySector(float[] directions, int primary)
     {
         int secondary = -1;
-        if (ambushSize < 2)
+        if (activeAmbushSize < 2)
             return secondary;
         for (int s = 0; s < EscapeSectors.Count; s++)
         {
@@ -735,12 +788,22 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
         return Mathf.Min(difference, EscapeSectors.Count - difference);
     }
 
-    /// <summary>FixedRing：在扇区里按 ambushRing 选的区域中心驻守</summary>
+    /// <summary>FixedRing：在扇区里按 ambushRing 选的区域中心驻守（按玩家风格分配、不伏击时撤销）</summary>
     private void SetSites(int primary, int secondary)
     {
-        int primaryQuota = secondary >= 0 ? ambushSize - ambushSize / 2 : ambushSize;
+        int size = activeAmbushSize;
+        if (size <= 0)
+            primary = secondary = -1;
+        int primaryQuota = secondary >= 0 ? size - size / 2 : size;
         SetSite(0, primary, -1, primary >= 0 ? primaryQuota : 0);
-        SetSite(1, secondary, -1, secondary >= 0 ? ambushSize / 2 : 0);
+        SetSite(1, secondary, -1, secondary >= 0 ? size / 2 : 0);
+    }
+
+    /// <summary>关口（按玩家风格分配）：扇区方向上离基地中心 gateDistance 处驻守 activeGateSize 个；sector &lt; 0 或人数为 0 时撤销</summary>
+    private void SetGate(int sector)
+    {
+        int quota = sector >= 0 ? activeGateSize : 0;
+        SetSite(GateSite, quota > 0 ? sector : -1, -1, quota, gateDistance);
     }
 
     /// <summary>Bandit：在扇区方向上离基地中心老虎机所选距离的位置驻守</summary>
@@ -752,13 +815,19 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
     }
 
     /// <param name="distanceIndex">老虎机的距离档；-1 = FixedRing（区域中心）</param>
-    private void SetSite(int index, int sector, int distanceIndex, int quota)
+    /// <param name="distance">&gt; 0 时驻守在扇区方向上离基地中心这么远的地方（关口），代替距离档和区域中心</param>
+    private void SetSite(int index, int sector, int distanceIndex, int quota, float distance = -1f)
     {
         AmbushSite site = sites[index];
         site.Quota = quota;
         int zone = -1;
         Vector2 position = Vector2.zero;
-        if (sector >= 0 && distanceIndex >= 0)
+        if (sector >= 0 && distance > 0f)
+        {
+            position = SectorPoint(sector, distance);
+            zone = context.Zones.GetZone(position);
+        }
+        else if (sector >= 0 && distanceIndex >= 0)
         {
             position = SectorPoint(sector, bandit.Distance(distanceIndex));
             zone = context.Zones.GetZone(position);

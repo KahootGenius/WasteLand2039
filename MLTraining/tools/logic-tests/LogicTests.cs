@@ -29,6 +29,7 @@ static partial class LogicTests
         BotTests();
         BotSensesTests();
         InterceptionTests();
+        StyleTests();
         CommanderLearningTests();
         ProfilePersistenceTests();
         PredictionTests();

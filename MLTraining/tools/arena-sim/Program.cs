@@ -1,6 +1,7 @@
 // The arena simulator's runs (GameArena.cs). Usage: MLTraining/tools/arena-sim.sh [MODE] [SEEDS] [EPISODES] [Option=value ...]
 //   calibrate  V2 in the simulator next to the real eval (default; the Option=value settings change the simulated arena)
 //   compare    V2 against V2 with the given options, on the same seeds: damage per wave and caught per flee by persona
+//              (e.g. compare 32 7 Style=true for -v2Style)
 //   intercept  the check against the two real interception trials (cut-off chasers without and with the 1-second rule)
 //   ablate     what the game rules found during the calibration change (damage per wave by persona)
 // SEEDS (default 16) runs per persona, EPISODES (default 7) episodes of 4 waves per run; options are GameArenaOptions fields,
@@ -191,6 +192,9 @@ static class Program
                               $"{Percentages(k => runs.Sum(a => a.TimeByRing[k]), time)} ({string.Join("/", real.Time.Select(x => $"{x:0}"))})");
         }
 
+        Console.WriteLine("profile's flee share at V2's replans (PlayerProfile.FleeShare; -v2Style treats 0.42 or more as a runner): " +
+                          string.Join("  ", results.Select(x => $"{x.persona} {x.runs.Sum(a => a.FleeShareSum) / Math.Max(1, x.runs.Sum(a => a.Replans)):0.00}")));
+
         Console.WriteLine("\n== Flees by route A / B / C: simulated (real). Damage away from home is counted to the wave's latest flee");
         foreach (var (p, runs) in results)
         {
@@ -268,6 +272,9 @@ static class Program
                     eval[s].Add(dmg[s]);
         }
         Console.WriteLine($"{"8 arenas",-10} mean change in damage per wave (RunnerB80 counted twice, as in the eval scene): {Change(Interval(eval.Select(e => e.Average()).ToList()))}");
+        if (other.Any(x => x.runs.Sum(a => a.RunnerReplans) > 0))
+            Console.WriteLine("treated as a runner at replans (-v2Style): " +
+                              string.Join("  ", other.Select(x => $"{x.persona} {100f * x.runs.Sum(a => a.RunnerReplans) / Math.Max(1, x.runs.Sum(a => a.Replans)):0}%")));
     }
 
     // ---------------------------------------------------------------- intercept

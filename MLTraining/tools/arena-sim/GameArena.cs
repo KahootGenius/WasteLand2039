@@ -14,7 +14,8 @@
 //   - episodes (ArenaEnvironment): 4 waves, 90 s limit per wave, 2 s pause, the player back home with full health and a
 //     new persona draw and player profile each episode
 //   - V2 (PredictiveCommander's defaults): ambush posts on the outer ring (radius 25.5) of the predicted escape sectors,
-//     quotas, retasking, spawning at the posts; and its -v2Intercept option (cut-off chasers)
+//     quotas, retasking, spawning at the posts; and its options -v2Intercept (cut-off chasers) and -v2Style (style-aware
+//     allocation, HordeStyle: a bigger ambush for players who mostly run, a gate on the way out for the others)
 // One step is one frame of eval.sh's lockstep (0.02 s of game time), in Unity's order (see Step). Nothing is fitted: every
 // number comes from the game. MLTraining/tools/arena-sim.sh calibrate compares the simulated V2 with the real eval (its
 // numbers are in Program.cs); damage per wave lands within 10% for six of the seven personas.
@@ -44,6 +45,10 @@ public class GameArenaOptions
     public SimCommander Commander = SimCommander.V2;
     public bool Intercept;                   // PredictiveCommander -v2Intercept
     public float InterceptMinRun = PlayerMotion.DefaultMinRunSeconds; // the 1-second rule; 0 = the first real trial (no rule)
+    public bool Style;                       // PredictiveCommander -v2Style, with its Inspector defaults (HordeStyle)
+    public float StyleShare = HordeStyle.DefaultRunnerFleeShare;
+    public int StyleRunnerAmbush = HordeStyle.DefaultRunnerAmbushSize, StyleGate = HordeStyle.DefaultGateSize;
+    public float StyleGateDistance = HordeStyle.DefaultGateDistance;
     public int WavesPerEpisode = 4;
     public bool BaseBlocksPlayer = true;
     public float BaseFriction = 0.4f;        // Unity's default 2D material (no PhysicsMaterial2D in the project)
@@ -85,6 +90,7 @@ public class GameArena
     const int AmbushSize = 2;
     const float MinEvidence = 2f, MinProbability = 0.35f, SplitRatio = 0.6f, SwitchMargin = 0.15f, RetaskMinDistance = 9f;
     const float MinSpawnFromPlayer = 10f, SpawnJitter = 2f, PredictionInterval = 1f, RingRadius = 25.5f;
+    const int GateSite = 2; // the third site: the gate of -v2Style
 
     class Zombie
     {
@@ -122,7 +128,8 @@ public class GameArena
     readonly List<Zombie> zombies = new List<Zombie>();
     readonly List<Bullet> bullets = new List<Bullet>();
     readonly List<Vector2> enemyPositions = new List<Vector2>();
-    readonly Site[] sites = { new Site(), new Site() };
+    readonly Site[] sites = { new Site(), new Site(), new Site() };
+    int activeAmbush = AmbushSize, activeGate; // this replan's ambush and gate sizes (V2: AmbushSize and 0)
     readonly float[] sectorProbabilities = new float[EscapeSectors.Count];
     readonly FrequencyPredictor predictor = new FrequencyPredictor();
     readonly PredictionInput input = new PredictionInput();
@@ -154,6 +161,9 @@ public class GameArena
     public int ShortFreezes, MidFreezes;
     public readonly Dictionary<string, int> LongFreezes = new Dictionary<string, int>();
     public float LongFreezeDamage;
+    // replans: the profile's flee share seen, and how many treated the player as a runner (-v2Style)
+    public int Replans, RunnerReplans;
+    public float FleeShareSum;
     float freezeStart = -1f, freezeDamage;
     bool freezeNear;
 
@@ -290,7 +300,7 @@ public class GameArena
         }
     }
 
-    // ---------------------------------------------------------------- V2 (PredictiveCommander.Replan / SetSite / FillSites)
+    // ---------------------------------------------------------------- V2 (PredictiveCommander.Replan / SetSites / SetGate / FillSites)
 
     int Members(int site) => zombies.Count(z => z.Site == site && !z.Dead);
 
@@ -298,10 +308,18 @@ public class GameArena
     {
         if (Options.Commander != SimCommander.V2)
             return;
-        if (profile.EscapeEvidence < MinEvidence)
+        (activeAmbush, activeGate) = Options.Style
+            ? HordeStyle.Allocate(profile.FleeShare, Options.StyleShare, Options.StyleRunnerAmbush, Options.StyleGate)
+            : (AmbushSize, 0);
+        Replans++;
+        FleeShareSum += profile.FleeShare;
+        if (Options.Style && HordeStyle.IsRunner(profile.FleeShare, Options.StyleShare))
+            RunnerReplans++;
+        if (profile.EscapeEvidence < MinEvidence || activeAmbush + activeGate <= 0)
         {
             SetSite(0, -1, 0);
             SetSite(1, -1, 0);
+            SetSite(GateSite, -1, 0);
             return;
         }
         input.Profile = profile;
@@ -313,15 +331,17 @@ public class GameArena
         int current = sites[0].Sector;
         int primary = current >= 0 && sectorProbabilities[top] < sectorProbabilities[current] + SwitchMargin ? current : top;
         int secondary = -1;
-        for (int s = 0; s < EscapeSectors.Count; s++)
+        for (int s = 0; s < EscapeSectors.Count && activeAmbush >= 2; s++)
         {
             if (SectorDistance(s, primary) < 2 || sectorProbabilities[s] < SplitRatio * sectorProbabilities[primary])
                 continue;
             if (secondary < 0 || sectorProbabilities[s] > sectorProbabilities[secondary])
                 secondary = s;
         }
-        SetSite(0, primary, secondary >= 0 ? AmbushSize - AmbushSize / 2 : AmbushSize);
-        SetSite(1, secondary, secondary >= 0 ? AmbushSize / 2 : 0);
+        int size = activeAmbush;
+        SetSite(0, size > 0 ? primary : -1, secondary >= 0 ? size - size / 2 : size);
+        SetSite(1, size > 0 ? secondary : -1, secondary >= 0 ? size / 2 : 0);
+        SetSite(GateSite, activeGate > 0 ? primary : -1, activeGate);
     }
 
     static int SectorDistance(int a, int b)
@@ -347,7 +367,7 @@ public class GameArena
             return;
         site.Sector = sector;
         float angle = sector * 2f * Mathf.PI / EscapeSectors.Count;
-        site.Post = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * RingRadius;
+        site.Post = new Vector2(Mathf.Cos(angle), Mathf.Sin(angle)) * (index == GateSite ? Options.StyleGateDistance : RingRadius);
     }
 
     void FillSites()
