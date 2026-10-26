@@ -6,8 +6,9 @@ using UnityEngine.SceneManagement;
 /// 实验分支的自动装配（每次加载场景时，无需修改场景）：
 /// 1. 为没有监测组件的 HordeEventSpawner 添加 PlayerBehaviourMonitor，采集玩家行为数据。
 ///    若场景中已手动放置 PlayerBehaviourMonitor（例如想调整参数或关闭遥测），则不做自动添加。
-/// 2. EnemyAISettings 选择 RL（且有模型）或 V2 时，为没有指定指挥官的 HordeEventSpawner 添加
-///    RLCommander（只推理）或 PredictiveCommander。训练场（有 ArenaManager 的场景）不受影响。
+/// 2. EnemyAISettings 选择 RL（且有模型）、V2 或 V2 Full 时，为没有指定指挥官的 HordeEventSpawner 添加
+///    RLCommander（只推理）或 PredictiveCommander（V2 Full = 同一个指挥官，打开按玩家风格分配和截击）。
+///    训练场（有 ArenaManager 的场景）不受影响。
 /// </summary>
 public static class EnemyAIBootstrap
 {
@@ -36,19 +37,32 @@ public static class EnemyAIBootstrap
         if (settings.gameCommander == EnemyAISettings.CommanderChoice.RL)
             InstallLearnedCommander(settings, spawners);
         else if (settings.gameCommander == EnemyAISettings.CommanderChoice.Predictive)
-            InstallPredictiveCommander(settings, spawners);
+            InstallPredictiveCommander(settings, spawners, false);
+        else if (settings.gameCommander == EnemyAISettings.CommanderChoice.PredictiveFull)
+            InstallPredictiveCommander(settings, spawners, true);
     }
 
-    private static void InstallPredictiveCommander(EnemyAISettings settings, HordeEventSpawner[] spawners)
+    /// <param name="full">V2 Full：评估过的配置（统计预测器、最可能的方向、固定圈层）+ 按玩家风格分配 + 截击，
+    /// 不读 V2 的预测器和自适应开关（按玩家风格分配只用于 Argmax + FixedRing）</param>
+    private static void InstallPredictiveCommander(EnemyAISettings settings, HordeEventSpawner[] spawners, bool full)
     {
         foreach (HordeEventSpawner spawner in spawners)
         {
             if (spawner.HasAssignedCommander || spawner.GetComponent<IHordeCommander>() != null)
                 continue;
             var commander = spawner.gameObject.AddComponent<PredictiveCommander>();
-            commander.Configure(settings.v2Predictor, settings.v2LearnedWeights);
-            commander.ConfigureAdaptive(settings.v2Thompson, settings.v2Bandit);
-            Debug.Log($"[EnemyAIBootstrap] {spawner.name}: 使用 V2 指挥官（{commander.DisplayName}）");
+            if (full)
+            {
+                commander.Configure(PredictiveCommander.PredictorChoice.Frequency, null);
+                commander.ConfigureAdaptive(false, false);
+                commander.ConfigureStyleAndIntercept(true, true);
+            }
+            else
+            {
+                commander.Configure(settings.v2Predictor, settings.v2LearnedWeights);
+                commander.ConfigureAdaptive(settings.v2Thompson, settings.v2Bandit);
+            }
+            Debug.Log($"[EnemyAIBootstrap] {spawner.name}: 使用 {(full ? "V2 Full" : "V2")} 指挥官（{commander.DisplayName}）");
         }
     }
 

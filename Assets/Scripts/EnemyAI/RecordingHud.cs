@@ -548,6 +548,7 @@ public class RecordingHud : MonoBehaviour
                     : "Warm-up:  done, no confident guess yet (top direction needs 35%)\n");
             else
                 text.Append($"Warm-up:  done, ambush unlocked  <color=#999999>({profile.Escapes} escapes seen)</color>\n");
+            AppendStyle(predictive);
 
             text.Append("Prediction:  ");
             if (predictive.HasPrediction)
@@ -625,8 +626,9 @@ public class RecordingHud : MonoBehaviour
                 continue;
             if (firstSector < 0)
                 firstSector = sector;
+            string gate = predictive.IsGateSite(i) ? "gate " : "";
             text.Append(any ? "   +   " : "")
-                .Append($"<color=#FF40D9>{SectorName(sector)}, {Vector2.Distance(position, center):0} u from base, " +
+                .Append($"<color=#FF40D9>{gate}{SectorName(sector)}, {Vector2.Distance(position, center):0} u from base, " +
                         $"{CountWaiting(squad, position)}/{quota} waiting</color>");
             any = true;
         }
@@ -664,6 +666,26 @@ public class RecordingHud : MonoBehaviour
         text.Append("  <color=#999999>estimated hit rate</color>\n");
     }
 
+    /// <summary>按玩家风格分配（V2 Full）：指挥官把玩家看作多半在跑还是多半在打，据此派多少人去哪里（HordeStyle）</summary>
+    private void AppendStyle(PredictiveCommander predictive)
+    {
+        if (!predictive.UsesStyleAllocation)
+            return;
+        float share = predictive.StyleFleeShare;
+        if (share < 0f)
+        {
+            text.Append("Style:  <color=#999999>not read yet</color>\n");
+            return;
+        }
+        string threshold = Percent(predictive.RunnerFleeShare);
+        text.Append(HordeStyle.IsRunner(share, predictive.RunnerFleeShare)
+            ? $"Style:  runner (flees in {Percent(share)} of fight time, {threshold}+ counts) → " +
+              $"{predictive.ActiveAmbushSize} wait at the refuge, no gate"
+            : $"Style:  fighter (flees in {Percent(share)} of fight time, under {threshold}) → " +
+              $"no far ambush, {predictive.ActiveGateSize} guards the way out {predictive.GateDistance:0} u from base");
+        text.Append(WarmedUp(predictive) ? "\n" : "  <color=#999999>(after warm-up)</color>\n");
+    }
+
     // ---------- 说明文字 ----------
 
     private static string DescribeCommander(IHordeCommander commander, PredictiveCommander predictive)
@@ -673,12 +695,18 @@ public class RecordingHud : MonoBehaviour
         if (predictive != null)
         {
             bool counting = predictive.Predictor == null || predictive.Predictor is FrequencyPredictor;
-            string text = (counting ? "V2, counts which way you flee" : "V2, a learned model guesses which way you flee") +
-                          $", then sends {predictive.AmbushSize} zombies to wait there";
+            bool full = predictive.UsesStyleAllocation && predictive.InterceptsRunningPlayer;
+            string text = (full ? "V2 Full, " : "V2, ") +
+                          (counting ? "counts which way you flee" : "a learned model guesses which way you flee") +
+                          (predictive.UsesStyleAllocation
+                              ? ", then sizes the ambush to your style"
+                              : $", then sends {predictive.AmbushSize} zombies to wait there");
             if (predictive.UsesBanditPlacement)
                 text += "; a bandit picks how far out they wait";
             if (predictive.UsesThompsonDirection)
                 text += "; direction drawn at random from the prediction";
+            if (predictive.InterceptsRunningPlayer)
+                text += "; chasers cut off a running player";
             return text + $"  <color=#999999>({commander.DisplayName})</color>";
         }
         if (commander is RLCommander)

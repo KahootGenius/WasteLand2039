@@ -12,5 +12,5 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a7ef761bcfdf74166b909eb5aa11c6a4, type: 3}
   m_Name: EnemyAISettings
   m_EditorClassIdentifier: 
-  gameCommander: 0
+  gameCommander: 3
   rlModel: {fileID: 5022602860645237092, guid: 4bc197a6fa59e44e2ba39a2fa0f36122, type: 3}

@@ -722,6 +722,7 @@ public static class ArenaAssetBuilder
     private const string MenuBaseline = "Tools/Enemy AI/Game Commander: Baseline";
     private const string MenuRL = "Tools/Enemy AI/Game Commander: RL";
     private const string MenuV2 = "Tools/Enemy AI/Game Commander: V2 (Predictive)";
+    private const string MenuV2Full = "Tools/Enemy AI/Game Commander: V2 Full (Style + Intercept)";
     private const string MenuV2Thompson = "Tools/Enemy AI/V2 Option: Thompson Direction";
     private const string MenuV2Bandit = "Tools/Enemy AI/V2 Option: Ambush Bandit";
 
@@ -743,9 +744,17 @@ public static class ArenaAssetBuilder
         SetGameCommander(EnemyAISettings.CommanderChoice.Predictive);
     }
 
+    /// <summary>V2 Full = V2 + 按玩家风格分配 + 截击（评估中的 Full，2026-10-22 胜过 V2）</summary>
+    [MenuItem(MenuV2Full, false, 103)]
+    private static void UseV2FullInGame()
+    {
+        SetGameCommander(EnemyAISettings.CommanderChoice.PredictiveFull);
+    }
+
     [MenuItem(MenuBaseline, true)]
     [MenuItem(MenuRL, true)]
     [MenuItem(MenuV2, true)]
+    [MenuItem(MenuV2Full, true)]
     private static bool ValidateGameCommanderMenu()
     {
         EnemyAISettings settings = AssetDatabase.LoadAssetAtPath<EnemyAISettings>(SettingsPath);
@@ -753,12 +762,13 @@ public static class ArenaAssetBuilder
         Menu.SetChecked(MenuBaseline, choice == EnemyAISettings.CommanderChoice.Baseline);
         Menu.SetChecked(MenuRL, choice == EnemyAISettings.CommanderChoice.RL);
         Menu.SetChecked(MenuV2, choice == EnemyAISettings.CommanderChoice.Predictive);
+        Menu.SetChecked(MenuV2Full, choice == EnemyAISettings.CommanderChoice.PredictiveFull);
         return true;
     }
 
-    // 自适应尸潮的两个开关（只在游戏场景使用 V2 指挥官时生效；训练场 / 评估用命令行 -v2Thompson / -v2Bandit）
+    // 自适应尸潮的两个开关（只在游戏场景使用 V2 指挥官时生效，V2 Full 不用；训练场 / 评估用命令行 -v2Thompson / -v2Bandit）
 
-    [MenuItem(MenuV2Thompson, false, 103)]
+    [MenuItem(MenuV2Thompson, false, 104)]
     private static void ToggleV2Thompson()
     {
         EnemyAISettings settings = EnsureSettings();
@@ -766,7 +776,7 @@ public static class ArenaAssetBuilder
         SaveV2Options(settings);
     }
 
-    [MenuItem(MenuV2Bandit, false, 104)]
+    [MenuItem(MenuV2Bandit, false, 105)]
     private static void ToggleV2Bandit()
     {
         EnemyAISettings settings = EnsureSettings();
@@ -791,7 +801,7 @@ public static class ArenaAssetBuilder
         string options = $"Thompson 方向 {(settings.v2Thompson ? "开" : "关")}，伏击老虎机 {(settings.v2Bandit ? "开" : "关")}";
         if (settings.gameCommander != EnemyAISettings.CommanderChoice.Predictive)
             Debug.LogWarning($"[ArenaAssetBuilder] V2 选项：{options}。游戏场景当前使用 {settings.gameCommander}，" +
-                             "选择 Game Commander: V2 (Predictive) 后才生效");
+                             "选择 Game Commander: V2 (Predictive) 后才生效（V2 Full 不用这两个选项）");
         else
             Debug.Log($"[ArenaAssetBuilder] 游戏场景的 V2 选项：{options}");
     }
@@ -804,6 +814,8 @@ public static class ArenaAssetBuilder
         AssetDatabase.SaveAssetIfDirty(settings);
         if (choice == EnemyAISettings.CommanderChoice.RL && settings.rlModel == null)
             Debug.LogWarning("[ArenaAssetBuilder] 游戏场景将使用 RL 指挥官，但还没有模型（Tools > Enemy AI > Install Latest Commander Model）；在此之前仍使用基准指挥官");
+        else if (choice == EnemyAISettings.CommanderChoice.PredictiveFull)
+            Debug.Log("[ArenaAssetBuilder] 游戏场景（MainGame 等）使用的指挥官：V2 Full（V2 + 按玩家风格分配 + 截击，不用 V2 选项）");
         else
             Debug.Log($"[ArenaAssetBuilder] 游戏场景（MainGame 等）使用的指挥官：{choice}");
     }

@@ -57,6 +57,10 @@ using UnityEngine;
 /// 模拟训练场（MLTraining/tools/arena-sim）中比 V2 每波多约 5 伤害（8 个训练场的平均），没有哪个性格变少；
 /// 多出的伤害大多在离开基地的路上（关口）和避难点外（多一个伏击者）。
 ///
+/// V2 Full = 按玩家风格分配 + 截击（-v2Style -v2Intercept）。2026-10-22 的评估（eval_adaptive.sh --set full，20 轮）：
+/// 8 个训练场平均每波伤害比 V2 多 4.4 [+3.0, +5.8]，没有哪个性格比 V2 少。游戏场景选 Game Commander: V2 Full
+/// （EnemyAISettings.CommanderChoice.PredictiveFull）时由 EnemyAIBootstrap 打开两者（ConfigureStyleAndIntercept）。
+///
 /// 遥测（经 PlayerBehaviourMonitor）：commander_order（与 RLCommander 格式相同），每次逃跑开始时的 prediction，
 /// 每次有效逃跑结算时（结束后的观察期满）的 ambush_trial（伏击 / 压迫小队是否接触，所有模式），老虎机每次更新的 bandit_update。
 ///
@@ -269,6 +273,20 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
     public float ContactRadius => contactRadius;
     public bool UsesBanditPlacement => placement == Placement.Bandit;
     public bool UsesThompsonDirection => directionChoice == DirectionChoice.Thompson;
+    /// <summary>按玩家风格分配是否在用（styleAware，且不是 Thompson / 老虎机模式）</summary>
+    public bool UsesStyleAllocation => UsesStyle;
+    /// <summary>截击是否打开（追击正在跑的玩家时朝相遇点走）</summary>
+    public bool InterceptsRunningPlayer => interceptChase;
+    /// <summary>逃跑占比至少这么多 = 多半在跑</summary>
+    public float RunnerFleeShare => runnerFleeShare;
+    /// <summary>上一次按风格分配时读到的逃跑占比；还没有分配过（或训练场换了新玩家）时为 -1</summary>
+    public float StyleFleeShare => styleFleeShare;
+    /// <summary>上一次 Replan 的伏击人数（避难点一带）和关口人数</summary>
+    public int ActiveAmbushSize => activeAmbushSize;
+    public int ActiveGateSize => activeGateSize;
+    public float GateDistance => gateDistance;
+    /// <summary>第 index 个伏击点是不是关口（按玩家风格分配时多半在打的玩家用）</summary>
+    public bool IsGateSite(int index) => index == GateSite;
     public int AmbushSiteCount => sites.Length;
 
     /// <summary>第 index 个伏击点；没有布置时返回 false</summary>
@@ -417,6 +435,8 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
     /// <summary>本次 Replan 的伏击人数（避难点一带）和关口人数；不按风格分配时 = ambushSize 和 0</summary>
     private int activeAmbushSize;
     private int activeGateSize;
+    /// <summary>上一次按风格分配时读到的逃跑占比（只给录制 HUD 看）；-1 = 还没有</summary>
+    private float styleFleeShare = -1f;
 
     private void Awake()
     {
@@ -501,6 +521,18 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
     {
         directionChoice = thompsonDirection ? DirectionChoice.Thompson : DirectionChoice.Argmax;
         placement = banditPlacement ? Placement.Bandit : Placement.FixedRing;
+    }
+
+    /// <summary>
+    /// 运行时打开 / 关闭按玩家风格分配和截击（EnemyAIBootstrap 为 V2 Full 调用，覆盖 Inspector 和命令行）；须在第一波开始前调用
+    /// （截击在敌人生成时设置）。按玩家风格分配只用于 Argmax + FixedRing，所以先 ConfigureAdaptive(false, false)
+    /// </summary>
+    public void ConfigureStyleAndIntercept(bool style, bool intercept)
+    {
+        styleAware = style;
+        interceptChase = intercept;
+        if (styleAware && UsesSampling)
+            Debug.LogWarning("[PredictiveCommander] 按玩家风格分配只用于 V2（Argmax + FixedRing），Thompson / Bandit 模式下不使用", this);
     }
 
     private IEscapePredictor CreatePredictor()
@@ -660,7 +692,10 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
 
         // 伏击 / 关口人数：按玩家风格分配时由画像中的逃跑占比决定，否则 = V2
         if (UsesStyle)
-            (activeAmbushSize, activeGateSize) = HordeStyle.Allocate(context.Profile.FleeShare, runnerFleeShare, runnerAmbushSize, gateSize);
+        {
+            styleFleeShare = context.Profile.FleeShare;
+            (activeAmbushSize, activeGateSize) = HordeStyle.Allocate(styleFleeShare, runnerFleeShare, runnerAmbushSize, gateSize);
+        }
         else
             (activeAmbushSize, activeGateSize) = (ambushSize, 0);
 
@@ -1365,7 +1400,10 @@ public class PredictiveCommander : MonoBehaviour, IHordeCommander, IArenaEpisode
         if (resetBanditEachEpisode)
             bandit?.Reset();
         if (arena != null && arena.ResetsProfileEachEpisode)
+        {
             reaction?.Reset(); // 反应模型是画像的一部分：画像重置时一起重置（新的"玩家"）
+            styleFleeShare = -1f; // HUD 不再显示上一个玩家的风格
+        }
     }
 
     public void OnArenaEpisodeEnded(ArenaEnvironment arena)
