@@ -3,7 +3,7 @@
 on existing plain-V2 eval telemetry, without Unity.
 
 Usage:
-  python3 MLTraining/analysis/outcome_offline.py. [--root DIR] [--markdown] [PREFIX[,PREFIX...]]
+  python3 MLTraining/analysis/outcome_offline.py [--root DIR] [--markdown] [PREFIX[,PREFIX...]]
   --root    telemetry folder (default: the eval player's EnemyAITelemetry folder, as in arena-report)
   PREFIX    batch prefixes, comma-separated (default: the plain-V2 batches of runs 2-4, as in the 24% analysis)
 
