@@ -234,10 +234,11 @@ Pre-run checks:
 
 ### How often V2's own guess is right (runs 2–4 pooled)
 
-Recomputed on 2026-10-15 from the telemetry of runs 2–4, plain V2 only. The guess is the most likely sector in V2's
-from-base prediction when the bot decides to flee (E = A, NW = B, SW = C), counted once the commander has 2 or more
-escapes of evidence; decisions whose top sector isn't one of the three routes are left out. The analysis script
-isn't in the repository.
+Recomputed on 2026-10-15 from the telemetry of runs 2–4, plain V2 only, with the original bots (before the
+player-like change of 2026-10-20; the README gives the same guess for the player-like bots). The guess is the most
+likely sector in V2's from-base prediction when the bot decides to flee (E = A, NW = B, SW = C), counted once the
+commander has 2 or more escapes of evidence; decisions whose top sector isn't one of the three routes are left out.
+`MLTraining/analysis/guess_analysis.py` reproduces it.
 
 | Bot | V2's guess right | Guessing from the bot's hidden route odds | No information |
 |---|---|---|---|
@@ -344,6 +345,8 @@ Commits on `adaptive-horde` (oldest first):
 
 ## 10. Who did what
 
+*"This branch" below is `adaptive-horde`, where runs 1–4 were done. It was merged into `main` on 2026-10-26.*
+
 - **Lawrence** (GitHub: KahootGenius; some commits as TaoziQ):
   - the idea and the plan, `adaptive_horde_plan.md`, written before any code: a Markov player model, a
     Thompson-sampling ambush bandit and claim-based coordination. The Thompson direction choice and the ambush
@@ -355,6 +358,12 @@ Commits on `adaptive-horde` (oldest first):
     `adaptive_metrics.py`, `make_figures.py`, `BanditTests.cs`, `ReactionTests.cs`
   - the decisions at each step: building on V2, which changes to make after each run, and adding layer 2.
   - every evaluation run.
+  - October 20–26 (`reports/lawrence-oct-22-eval.md`, `reports/lawrence-oct-24-eval.md`): the player-like bots
+    (`BotSenses` in `Bots/BotBrain.cs`, `BotSensesTests.cs`), per-round arena seeds (`-arenaSeed`), the offline
+    replay of the outcome model that led to dropping it (`outcome_offline.py`), Style (`Prediction/HordeStyle.cs`,
+    `StyleTests.cs`), the cut-off chasers (`Prediction/Interception.cs`, `Orders/Enemy.Interception.cs`,
+    `InterceptionTests.cs`), V2 Full as a game commander, the arena simulator (`MLTraining/tools/arena-sim/`),
+    `paired_damage.py`, and the pre-registered V2 Full evaluation: its criteria, the run and the results report.
 - **Claude** (Anthropic's AI assistant, through Claude Code), at Lawrence's request:
   - before this branch, on `experiment/enemy-ml`: the tracker, player profile, arena, bots, V1 (RL) and V2
     (predictive). This branch includes them because the build needs them.
@@ -362,8 +371,13 @@ Commits on `adaptive-horde` (oldest first):
     `reports/2026-09-27-adaptive-horde-on-v2.md`).
   - The Arena and the bot changes
   - the run reports, this write-up and the README.
+  - after runs 1–4: `MLTraining/analysis/guess_analysis.py`, the script behind the 2026-10-15 guess-accuracy table
+    (Lawrence added it to the repository on 2026-10-20); the documentation fixes of 2026-10-15 to 2026-10-18
+    (chance levels, V2's guess accuracy); and the recording overlay for the demo video (`RecordingHud.cs`; Lawrence
+    added its Style lines).
 
-Two commits on this branch carry a `Co-Authored-By: Claude` trailer; the division above applies to every commit.
+Since 2026-10-09, commits made with Claude Code carry a `Co-Authored-By: Claude` trailer; earlier commits don't. The
+division above, not the trailers, applies to every commit.
 
 An earlier version of this section, and the README, said Claude wrote all the code on this branch. That was wrong
 for the adaptive-horde files listed under Lawrence, and was corrected on 2026-10-09.
