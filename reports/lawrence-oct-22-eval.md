@@ -3,6 +3,7 @@ Version: Full = Style + cut-off chasers (-v2Style -v2Intercept; the cut-off keep
   rule). No outcome observation: it was dropped after the offline replay predicted no gain
   (rerun on the 19 current-bot V2 rounds: Adaptive route guessing +0.6 [−1.3, +2.5]; RunnerA
   −2.9, RunnerB80 −4.7). Eval scene unchanged (RunnerB80 in arenas 2 and 7).
+  Replay output: reports/lawrence-oct-20-outcome-replay.txt (added 2026-10-26).
 Run: MLTraining/eval_adaptive.sh --set full --repeats 20 --seed 20261023 (V2, Style, Full; fresh
   seeds, about 80 min). Stale-build check: every Full arena must log
   "commander":"V2-Frequency+Intercept+Style" (Style's: V2-Frequency+Style); expect 160 of them:
