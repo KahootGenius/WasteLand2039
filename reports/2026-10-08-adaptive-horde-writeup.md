@@ -86,7 +86,7 @@ The Adaptive bot reacts to exactly this check.
 | Eval player builder, multi-variant runner with repeats, new metrics, comparison tool with pooled repeats | `Arena/Editor/EvalPlayerBuilder.cs`, `MLTraining/build_eval_player.sh`, `MLTraining/eval_adaptive.sh`, `MLTraining/analysis/adaptive_metrics.py`, `MLTraining/tools/arena-report.py` | 1–2 |
 | Contact radius 6 (`-v2ContactRadius`); the bandit picks only the distance in the direction the rule chose | `PredictiveCommander` | 2 |
 | **Ground truth:** each `bot_ambushed` event records the cause (damage / ahead / at the refuge) and the order of the zombie behind it (holding = an ambush squad, otherwise a chaser) | `Bots/BotBrain.cs`, `Arena/PlayerBot.cs`, `Arena/ArenaEnvironment.cs` | 3 |
-| Contact watched for 5 s after the escape ends (`-v2ContactTail`); re-choose after every escape, keep a site's distance until it was tried (`-v2RedrawEveryEscape` = redraw every time) | `PredictiveCommander` | 3 |
+| Contact watched for up to 5 s after the escape ends (`-v2ContactTail`); re-choose after every escape, keep a site's distance until it was tried (`-v2RedrawEveryEscape` = redraw every time) | `PredictiveCommander` | 3 |
 | **Layer 2, player reaction model:** lose-shift learner with candidate avoidance strengths {1 = no reaction, 0.6, 0.35, 0.2, 0.1}, a Bayesian update from the player's choices, probability moved only between routes the player uses; "outings" observed in every mode | `Prediction/ReactionModel.cs`, `PredictiveCommander` (`-v2Reaction`, `-v2ReactionPrior`) | 4 |
 | Logic tests outside Unity (samplers, bandit choice and forgetting, state round trip, Dirichlet sampling, ambush causes, reaction model) | `MLTraining/tools/logic-tests/BanditTests.cs`, `ReactionTests.cs`, `BotTests.cs` | all |
 
@@ -156,7 +156,8 @@ direction V2's rule chose. Sites re-chosen only after they were tried. 2 repeats
 
 Three changes:
 - `bot_ambushed` now says whether a waiting zombie or a chaser did it;
-- contact is watched for 5 s after the escape ends;
+- contact is watched for up to 5 s after the escape ends (in practice about 2 s, because the bot's next flee usually
+  ended the window; see §7);
 - the direction is re-chosen after every escape, while an untried site keeps its distance.
 
 **Ground truth (V2):**
@@ -185,7 +186,7 @@ gets about 70% contact:
 
 | Route A contact rate when the player ran there | 12 | 18 | 25 |
 |---|---|---|---|
-| with the 5 s window (Bandit) | 75% | 74% | 73% |
+| with the tail after the escape (Bandit) | 75% | 74% | 73% |
 | escape only (Bandit-tail0, = run 2's reward) | 60% | 37% | 25% |
 
 **Findings:**
@@ -193,7 +194,15 @@ gets about 70% contact:
   placement bandit has nothing to learn.
 - Thompson direction is worse for every persona, including Adaptive (22% → 12%, z ≈ 2.6). Re-drawing the direction
   after every escape also made it move the ambushers about 10× as often as V2.
-- V2 predicts Adaptive's route *below* chance (24% top-1): the bot avoids the route the counts point at.
+- V2's route prediction for Adaptive is no better than chance. The commander's own top-1 guess is right 35.5% of the
+  time (runs 2–4 pooled; see "How often V2's own guess is right" below), against 33.3% for a uniform guess and 35.3%
+  if guess and route were independent: it carries no information about this bot, rather than pointing the wrong
+  way. The zombie-count metric agrees once ties are handled: on the flee decisions without a tie for the most
+  zombies, the most-occupied route sector was the bot's route 33% of the time in run 3 (32/98) and 34.1%
+  [28.7–39.9] in run 4 (92/270). `arena-report.py` scores a tie as a miss, which puts that metric's chance level at
+  24.9% (run 3) and 23.5% (run 4) rather than 33%; its counts, 32 of 131 and 92 of 383, sit right at those levels.
+  An earlier version of this write-up compared the tie-scored rate with 33%, the wrong chance level for that metric,
+  and drew the wrong conclusion from it.
 
 ### Run 4 (2026-10-08): layer 2, the player reaction model
 
@@ -201,8 +210,9 @@ V2, Reaction (prior P(no reaction) 0.5), and Reaction-p0.8; 6 repeats.
 
 Pre-run checks:
 - In a toy model of the Adaptive bot, the reaction model raised ambushes by an ambusher from ~18% to ~23%.
-- In the logic tests, top-1 prediction went from 30% to 40%; in the scripted harness with a reacting player, from 33%
-  to 57%.
+- In the logic tests (`ReactionTests.cs`), top-1 prediction went from 30% to 40% for a player following the Adaptive
+  rule. In the scripted harness with a reacting player it went from 33% to 57%, but that harness is kept outside the
+  repo, so this number can't be reproduced from it.
 - A non-reacting player was left alone in all three.
 
 | | V2 | Reaction | Reaction-p0.8 |
@@ -221,6 +231,25 @@ Pre-run checks:
 - The commander counted any zombie within 6 units on the way out as "met", chasers behind the player included. That
   fired on 74% of Adaptive's outings, but the bot's own check fired on 56% of its flees.
 - In the toy model, that many false alarms leaves only about +2 points of gain, which is inside the noise.
+
+### How often V2's own guess is right (runs 2–4 pooled)
+
+Recomputed on 2026-10-15 from the telemetry of runs 2–4, plain V2 only. The guess is the most likely sector in V2's
+from-base prediction when the bot decides to flee (E = A, NW = B, SW = C), counted once the commander has 2 or more
+escapes of evidence; decisions whose top sector isn't one of the three routes are left out. The analysis script
+isn't in the repository.
+
+| Bot | V2's guess right | Guessing from the bot's hidden route odds | No information |
+|---|---|---|---|
+| RunnerA (always route A) | 98.3% [97.2–99.0] (825/839) | 100% | 33.3% |
+| RunnerB80 (route B 80% of the time) | 75.2% [72.9–77.3] (1,100/1,463) | 80.0%, the ceiling | 33.3% |
+| Adaptive (avoids a route after being caught on it) | 35.5% [32.3–38.8] (302/851) | 60.3% | 33.3% (uniform); 35.3% if guess and route were independent |
+
+- RunnerB80 rolls B 80% of the time, so no guess can do better than 80% on average.
+- Adaptive is predictable from its internal state (60.3%) but not from its route history. After being caught on a
+  route it goes back to it 23% of the time, against 45% after a clean escape, while V2's next guess still points at
+  that route half the time (235/468) and is right on only 25% of those. V2 counts *where* the bot ran, not *whether
+  it was caught there*.
 
 ## 6. What was learned
 
@@ -257,6 +286,9 @@ Pre-run checks:
   window was usually cut short by the next escape (about 2 s on average for the runners).
 - **Power.** Runs 2–3 had 2 repeats per variant, enough for differences of about 10 points. Run 4 had 6, enough for
   about 5.
+- **Repeats share the bots' random seeds.** Every repeat reuses the same bot RNG seed
+  (`System.Random(20260925 + 7919·k)` for arena k), so the repeats are not independent and the reported intervals
+  are too narrow.
 
 ## 8. Possible next steps
 

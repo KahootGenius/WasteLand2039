@@ -383,14 +383,14 @@ def fig_contact_window():
             "Route C": ([68, 57, 62], [59, 61, 20])}
     s = SVG(880, 404, "Contact rate by ambush distance and window",
             "Small multiples for routes A, B, C: contact rate of the bandit's ambush sites at 12, 18 and 25 units. "
-            "Watching only during the escape favours the near site; watching 5 s past the escape end, all distances "
-            "score about the same.")
+            "Watching only during the escape favours the near site; watching about 2 s past the escape end (up to 5 s, "
+            "until the bot fled again), all distances score about the same.")
     s.header("The bandit's 'best distance' came from the measurement window",
              ["Run 3: how often an ambusher at 12, 18 or 25 u came within 6 u of a player who ran that route. "
               "Watched only until",
-              "the escape tracker ended the escape, near sites win; watched 5 s longer, every distance works about "
+              "the escape tracker ended the escape, near sites win; watched about 2 s longer, every distance works about "
               "equally."])
-    s.legend(24, 108, [(C_ADA, "Bandit: watched until 5 s after the escape ends", "dot"),
+    s.legend(24, 108, [(C_ADA, "Bandit: watched on after the escape ends (about 2 s)", "dot"),
                        (C_VIO, "Bandit-tail0: watched during the escape only (run 2's reward)", "dot")], gap=22)
     top, bottom, pw = 150, 330, 200
     for k, (route, (tail, esc_only)) in enumerate(data.items()):

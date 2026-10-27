@@ -17,7 +17,8 @@ Variants: V2, Reaction (prior P(no reaction) 0.5), Reaction-p0.8 (prior 0.8); 6 
 
 Before the run: in a toy model of the Adaptive bot, the model raised ambushes by an ambusher from ~18% to ~23%. In the
 logic tests, top-1 went from 30% to 40% for a player following the Adaptive rule. In the scripted harness with a
-reacting player it went from 33% to 57%. In all three it left a non-reacting player alone.
+reacting player it went from 33% to 57% (that harness is kept outside the repo, so this number can't be reproduced
+from it). In all three it left a non-reacting player alone.
 
 ## Setup checks
 
