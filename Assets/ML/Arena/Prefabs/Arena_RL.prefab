@@ -1,0 +1,141 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!1001 &7946017023622407398
+PrefabInstance:
+  m_ObjectHideFlags: 0
+  serializedVersion: 2
+  m_Modification:
+    serializedVersion: 3
+    m_TransformParent: {fileID: 0}
+    m_Modifications:
+    - target: {fileID: 585935547712820674, guid: b82556b658518493ba4bb31fcf4a6ecf, type: 3}
+      propertyPath: m_LocalPosition.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 585935547712820674, guid: b82556b658518493ba4bb31fcf4a6ecf, type: 3}
+      propertyPath: m_LocalPosition.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 585935547712820674, guid: b82556b658518493ba4bb31fcf4a6ecf, type: 3}
+      propertyPath: m_LocalPosition.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 585935547712820674, guid: b82556b658518493ba4bb31fcf4a6ecf, type: 3}
+      propertyPath: m_LocalRotation.w
+      value: 1
+      objectReference: {fileID: 0}
+    - target: {fileID: 585935547712820674, guid: b82556b658518493ba4bb31fcf4a6ecf, type: 3}
+      propertyPath: m_LocalRotation.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 585935547712820674, guid: b82556b658518493ba4bb31fcf4a6ecf, type: 3}
+      propertyPath: m_LocalRotation.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 585935547712820674, guid: b82556b658518493ba4bb31fcf4a6ecf, type: 3}
+      propertyPath: m_LocalRotation.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 585935547712820674, guid: b82556b658518493ba4bb31fcf4a6ecf, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.x
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 585935547712820674, guid: b82556b658518493ba4bb31fcf4a6ecf, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.y
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 585935547712820674, guid: b82556b658518493ba4bb31fcf4a6ecf, type: 3}
+      propertyPath: m_LocalEulerAnglesHint.z
+      value: 0
+      objectReference: {fileID: 0}
+    - target: {fileID: 1378538267536131345, guid: b82556b658518493ba4bb31fcf4a6ecf, type: 3}
+      propertyPath: wavesPerEpisode
+      value: 4
+      objectReference: {fileID: 0}
+    - target: {fileID: 2123192330388905978, guid: b82556b658518493ba4bb31fcf4a6ecf, type: 3}
+      propertyPath: m_Name
+      value: Arena_RL
+      objectReference: {fileID: 0}
+    - target: {fileID: 2968329931973904085, guid: b82556b658518493ba4bb31fcf4a6ecf, type: 3}
+      propertyPath: commanderComponent
+      value: 
+      objectReference: {fileID: 6615206471219079434}
+    m_RemovedComponents: []
+    m_RemovedGameObjects: []
+    m_AddedGameObjects: []
+    m_AddedComponents:
+    - targetCorrespondingSourceObject: {fileID: 4510409440736496911, guid: b82556b658518493ba4bb31fcf4a6ecf, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 2322394170800316098}
+    - targetCorrespondingSourceObject: {fileID: 4510409440736496911, guid: b82556b658518493ba4bb31fcf4a6ecf, type: 3}
+      insertIndex: -1
+      addedObject: {fileID: 6615206471219079434}
+  m_SourcePrefab: {fileID: 100100000, guid: b82556b658518493ba4bb31fcf4a6ecf, type: 3}
+--- !u!1 &5827056618681051625 stripped
+GameObject:
+  m_CorrespondingSourceObject: {fileID: 4510409440736496911, guid: b82556b658518493ba4bb31fcf4a6ecf, type: 3}
+  m_PrefabInstance: {fileID: 7946017023622407398}
+  m_PrefabAsset: {fileID: 0}
+--- !u!114 &2322394170800316098
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5827056618681051625}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5d1c4e0b1822b495aa52bc52839ecb30, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  m_BrainParameters:
+    VectorObservationSize: 111
+    NumStackedVectorObservations: 1
+    m_ActionSpec:
+      m_NumContinuousActions: 0
+      BranchSizes: 040000001300000003000000
+    VectorActionSize: 040000001300000003000000
+    VectorActionDescriptions: []
+    VectorActionSpaceType: 0
+    hasUpgradedBrainParametersWithActionSpec: 1
+  m_Model: {fileID: 5022602860645237092, guid: 4bc197a6fa59e44e2ba39a2fa0f36122, type: 3}
+  m_InferenceDevice: 0
+  m_BehaviorType: 0
+  m_BehaviorName: HordeCommander
+  TeamId: 0
+  m_UseChildSensors: 1
+  m_UseChildActuators: 1
+  m_DeterministicInference: 1
+  m_ObservableAttributeHandling: 0
+--- !u!114 &6615206471219079434
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 5827056618681051625}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1576c6931e9ba45ca85d7c88e60c0018, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  agentParameters:
+    maxStep: 0
+  hasUpgradedFromAgentParameters: 1
+  MaxStep: 0
+  actionScheme: 1
+  decisionInterval: 2
+  holdEngageRadius: 6
+  minSpawnDistanceFromPlayer: 10
+  spawnJitter: 3
+  rewards:
+    interception: 1
+    interceptRadius: 2.5
+    interceptGraceSeconds: 1
+    headOnBonus: 0
+    headOnCosine: 0.5
+    damagePerHp: 0.01
+    playerKilled: 1
+    unharmedWave: -0.5
+    engagedPerSecond: 0.002
+  curriculumParameter: persona_level

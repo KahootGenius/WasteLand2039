@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="404" viewBox="0 0 880 404" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" role="img" aria-labelledby="title desc">
+<title id="title">Contact rate by ambush distance and window</title>
+<desc id="desc">Small multiples for routes A, B, C: contact rate of the bandit's ambush sites at 12, 18 and 25 units. Watching only during the escape favours the near site; watching 5 s past the escape end, all distances score about the same.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#52514e"/></marker></defs>
+<rect x="0.5" y="0.5" width="879" height="403" rx="12" fill="#fcfcfb" stroke="#e1e0d9"/>
+<text x="24.0" y="34.0" font-size="17" fill="#0b0b0b" font-weight="600">The bandit's 'best distance' came from the measurement window</text>
+<text x="24.0" y="55.0" font-size="12.5" fill="#52514e">Run 3: how often an ambusher at 12, 18 or 25 u came within 6 u of a player who ran that route. Watched only until</text>
+<text x="24.0" y="73.0" font-size="12.5" fill="#52514e">the escape tracker ended the escape, near sites win; watched 5 s longer, every distance works about equally.</text>
+<circle cx="29.0" cy="104.5" r="5" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
+<text x="40.0" y="108.0" font-size="12" fill="#52514e">Bandit: watched until 5 s after the escape ends</text>
+<circle cx="367.8" cy="104.5" r="5" fill="#4a3aa7" stroke="#fcfcfb" stroke-width="2"/>
+<text x="378.8" y="108.0" font-size="12" fill="#52514e">Bandit-tail0: watched during the escape only (run 2's reward)</text>
+<text x="76.0" y="138.0" font-size="13" fill="#0b0b0b" font-weight="600">Route A</text>
+<line x1="76.0" y1="330.0" x2="276.0" y2="330.0" stroke="#c3c2b7" stroke-width="1"/>
+<text x="68.0" y="334.0" font-size="11" fill="#898781" text-anchor="end">0%</text>
+<line x1="76.0" y1="285.0" x2="276.0" y2="285.0" stroke="#e1e0d9" stroke-width="1"/>
+<text x="68.0" y="289.0" font-size="11" fill="#898781" text-anchor="end">25%</text>
+<line x1="76.0" y1="240.0" x2="276.0" y2="240.0" stroke="#e1e0d9" stroke-width="1"/>
+<text x="68.0" y="244.0" font-size="11" fill="#898781" text-anchor="end">50%</text>
+<line x1="76.0" y1="195.0" x2="276.0" y2="195.0" stroke="#e1e0d9" stroke-width="1"/>
+<text x="68.0" y="199.0" font-size="11" fill="#898781" text-anchor="end">75%</text>
+<line x1="76.0" y1="150.0" x2="276.0" y2="150.0" stroke="#e1e0d9" stroke-width="1"/>
+<text x="68.0" y="154.0" font-size="11" fill="#898781" text-anchor="end">100%</text>
+<text x="98.0" y="347.0" font-size="11" fill="#898781" text-anchor="middle">12 u</text>
+<text x="170.0" y="347.0" font-size="11" fill="#898781" text-anchor="middle">18 u</text>
+<text x="254.0" y="347.0" font-size="11" fill="#898781" text-anchor="middle">25 u</text>
+<polyline points="98.0,222.0 170.0,263.4 254.0,285.0" fill="none" stroke="#4a3aa7" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="98.0" cy="222.0" r="4.5" fill="#4a3aa7" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="170.0" cy="263.4" r="4.5" fill="#4a3aa7" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="254.0" cy="285.0" r="4.5" fill="#4a3aa7" stroke="#fcfcfb" stroke-width="2"/>
+<polyline points="98.0,195.0 170.0,196.8 254.0,198.6" fill="none" stroke="#1baf7a" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="98.0" cy="195.0" r="4.5" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="170.0" cy="196.8" r="4.5" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="254.0" cy="198.6" r="4.5" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
+<text x="98.0" y="184.0" font-size="11" fill="#52514e" text-anchor="middle">75%</text>
+<text x="170.0" y="185.8" font-size="11" fill="#52514e" text-anchor="middle">74%</text>
+<text x="254.0" y="187.6" font-size="11" fill="#52514e" text-anchor="middle">73%</text>
+<text x="98.0" y="241.0" font-size="11" fill="#52514e" text-anchor="middle">60%</text>
+<text x="170.0" y="282.4" font-size="11" fill="#52514e" text-anchor="middle">37%</text>
+<text x="254.0" y="304.0" font-size="11" fill="#52514e" text-anchor="middle">25%</text>
+<text x="356.0" y="138.0" font-size="13" fill="#0b0b0b" font-weight="600">Route B</text>
+<line x1="356.0" y1="330.0" x2="556.0" y2="330.0" stroke="#c3c2b7" stroke-width="1"/>
+<line x1="356.0" y1="285.0" x2="556.0" y2="285.0" stroke="#e1e0d9" stroke-width="1"/>
+<line x1="356.0" y1="240.0" x2="556.0" y2="240.0" stroke="#e1e0d9" stroke-width="1"/>
+<line x1="356.0" y1="195.0" x2="556.0" y2="195.0" stroke="#e1e0d9" stroke-width="1"/>
+<line x1="356.0" y1="150.0" x2="556.0" y2="150.0" stroke="#e1e0d9" stroke-width="1"/>
+<text x="378.0" y="347.0" font-size="11" fill="#898781" text-anchor="middle">12 u</text>
+<text x="450.0" y="347.0" font-size="11" fill="#898781" text-anchor="middle">18 u</text>
+<text x="534.0" y="347.0" font-size="11" fill="#898781" text-anchor="middle">25 u</text>
+<polyline points="378.0,211.2 450.0,276.0 534.0,265.2" fill="none" stroke="#4a3aa7" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="378.0" cy="211.2" r="4.5" fill="#4a3aa7" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="450.0" cy="276.0" r="4.5" fill="#4a3aa7" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="534.0" cy="265.2" r="4.5" fill="#4a3aa7" stroke="#fcfcfb" stroke-width="2"/>
+<polyline points="378.0,196.8 450.0,218.4 534.0,205.8" fill="none" stroke="#1baf7a" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="378.0" cy="196.8" r="4.5" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="450.0" cy="218.4" r="4.5" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="534.0" cy="205.8" r="4.5" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
+<text x="636.0" y="138.0" font-size="13" fill="#0b0b0b" font-weight="600">Route C · fewer trials</text>
+<line x1="636.0" y1="330.0" x2="836.0" y2="330.0" stroke="#c3c2b7" stroke-width="1"/>
+<line x1="636.0" y1="285.0" x2="836.0" y2="285.0" stroke="#e1e0d9" stroke-width="1"/>
+<line x1="636.0" y1="240.0" x2="836.0" y2="240.0" stroke="#e1e0d9" stroke-width="1"/>
+<line x1="636.0" y1="195.0" x2="836.0" y2="195.0" stroke="#e1e0d9" stroke-width="1"/>
+<line x1="636.0" y1="150.0" x2="836.0" y2="150.0" stroke="#e1e0d9" stroke-width="1"/>
+<text x="658.0" y="347.0" font-size="11" fill="#898781" text-anchor="middle">12 u</text>
+<text x="730.0" y="347.0" font-size="11" fill="#898781" text-anchor="middle">18 u</text>
+<text x="814.0" y="347.0" font-size="11" fill="#898781" text-anchor="middle">25 u</text>
+<polyline points="658.0,223.8 730.0,220.2 814.0,294.0" fill="none" stroke="#4a3aa7" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="658.0" cy="223.8" r="4.5" fill="#4a3aa7" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="730.0" cy="220.2" r="4.5" fill="#4a3aa7" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="814.0" cy="294.0" r="4.5" fill="#4a3aa7" stroke="#fcfcfb" stroke-width="2"/>
+<polyline points="658.0,207.6 730.0,227.4 814.0,218.4" fill="none" stroke="#1baf7a" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+<circle cx="658.0" cy="207.6" r="4.5" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="730.0" cy="227.4" r="4.5" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
+<circle cx="814.0" cy="218.4" r="4.5" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
+<text x="456.0" y="370.0" font-size="11.5" fill="#52514e" text-anchor="middle">distance of the ambush site from the base</text>
+</svg>

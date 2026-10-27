@@ -37,7 +37,10 @@ public class WeaponManager : MonoBehaviour
     public bool HasWeapon => currentWeapon != null;
     public int WeaponCount => availableWeapons.Count;
     public int CurrentWeaponIndex => currentWeaponIndex;
-    
+
+    /// <summary>输入来源（实验分支，训练场的机器人使用）；为空时读取鼠标键盘（原版行为）</summary>
+    public IPlayerInput InputOverride { get; set; }
+
     private void Awake()
     {
         // 获取摄像机引用
@@ -104,9 +107,12 @@ public class WeaponManager : MonoBehaviour
         // 处理射击输入
         HandleFireInput();
         
-        // 处理武器切换输入
-        HandleWeaponSwitching();
-        
+        // 处理武器切换输入（机器人不切换武器）
+        if (InputOverride == null)
+        {
+            HandleWeaponSwitching();
+        }
+
         // 处理重装输入
         HandleReloadInput();
     }
@@ -159,8 +165,17 @@ public class WeaponManager : MonoBehaviour
     private void UpdateAimDirection()
     {
         Vector2 newDirection = aimDirection;
-        
-        if (useMouseAiming && playerCamera != null)
+
+        if (InputOverride != null)
+        {
+            // 外部输入（机器人）直接给出瞄准方向
+            Vector2 aim = InputOverride.Aim;
+            if (aim.sqrMagnitude > 0.0001f)
+            {
+                newDirection = aim.normalized;
+            }
+        }
+        else if (useMouseAiming && playerCamera != null)
         {
             // 鼠标瞄准
             Vector3 mouseWorldPos = playerCamera.ScreenToWorldPoint(Input.mousePosition);
@@ -292,7 +307,8 @@ public class WeaponManager : MonoBehaviour
     /// </summary>
     private void HandleReloadInput()
     {
-        if (Input.GetKeyDown(KeyCode.R) && currentWeapon != null)
+        bool reloadInput = InputOverride != null ? InputOverride.ConsumeReload() : Input.GetKeyDown(KeyCode.R);
+        if (reloadInput && currentWeapon != null)
         {
             currentWeapon.StartReload();
         }
@@ -303,9 +319,9 @@ public class WeaponManager : MonoBehaviour
     /// </summary>
     private void HandleFireInput()
     {
-        // 检查左键点击或空格键
-        bool mouseInput = Input.GetMouseButtonDown(0);
-        bool keyboardInput = Input.GetKeyDown(KeyCode.Space);
+        // 检查左键点击或空格键（设置了 InputOverride 时由其提供，等同于按空格）
+        bool mouseInput = InputOverride == null && Input.GetMouseButtonDown(0);
+        bool keyboardInput = InputOverride != null ? InputOverride.ConsumeFire() : Input.GetKeyDown(KeyCode.Space);
         
         // 如果是鼠标输入，检查是否点击在UI上（添加调试信息）
         if (mouseInput)

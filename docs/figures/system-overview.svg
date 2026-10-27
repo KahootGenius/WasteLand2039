@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="392" viewBox="0 0 880 392" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" role="img" aria-labelledby="title desc">
+<title id="title">How the horde experiment is wired</title>
+<desc id="desc">The player (a human or a scripted bot) is observed by a player model; a swappable horde commander (Baseline, V1 reinforcement learning, V2 predictive, V2 with adaptive options) reads it and orders squads of zombies. Telemetry is logged and used offline for training and evaluation.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#52514e"/></marker></defs>
+<rect x="0.5" y="0.5" width="879" height="391" rx="12" fill="#fcfcfb" stroke="#e1e0d9"/>
+<text x="24.0" y="34.0" font-size="17" fill="#0b0b0b" font-weight="600">One game loop, swappable horde brains</text>
+<text x="24.0" y="55.0" font-size="12.5" fill="#52514e">Every commander reads the same player model and gives the same kinds of orders. Only the decision-making differs.</text>
+<path d="M777,124 V86 H97 V121" fill="none" stroke="#898781" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="334" y="78" width="212" height="16" fill="#fcfcfb"/>
+<text x="440.0" y="90.0" font-size="11.5" fill="#898781" text-anchor="middle">zombies chase, hold and ambush</text>
+<rect x="24" y="124" width="146" height="120" rx="10" fill="#ffffff" stroke="#c3c2b7"/>
+<text x="38.0" y="148.0" font-size="13.5" fill="#0b0b0b" font-weight="600">Player</text>
+<text x="38.0" y="169.0" font-size="12" fill="#52514e">a human at the</text>
+<text x="38.0" y="186.0" font-size="12" fill="#52514e">keyboard, or a bot</text>
+<text x="38.0" y="203.0" font-size="12" fill="#52514e">persona driving the</text>
+<text x="38.0" y="220.0" font-size="12" fill="#52514e">same controls</text>
+<rect x="204" y="124" width="206" height="120" rx="10" fill="#ffffff" stroke="#c3c2b7"/>
+<text x="218.0" y="148.0" font-size="13.5" fill="#0b0b0b" font-weight="600">Player model</text>
+<text x="218.0" y="165.0" font-size="11.5" fill="#898781">PlayerBehaviourMonitor</text>
+<text x="218.0" y="186.0" font-size="12" fill="#52514e">fight · flee · kite · passive</text>
+<text x="218.0" y="203.0" font-size="12" fill="#52514e">escape directions (8),</text>
+<text x="218.0" y="220.0" font-size="12" fill="#52514e">decayed per escape</text>
+<rect x="444" y="98" width="220" height="172" rx="10" fill="#ffffff" stroke="#52514e" stroke-width="1.5"/>
+<text x="458.0" y="122.0" font-size="13.5" fill="#0b0b0b" font-weight="600">Horde commander</text>
+<text x="458.0" y="139.0" font-size="11.5" fill="#898781">IHordeCommander (swappable)</text>
+<rect x="456" y="150" width="196" height="25" rx="6" fill="#fcfcfb" stroke="#e1e0d9"/>
+<circle cx="470.0" cy="162.5" r="5" fill="#898781" stroke="#fcfcfb" stroke-width="2"/>
+<text x="482.0" y="167.0" font-size="12"><tspan fill="#0b0b0b" font-weight="600">Baseline</tspan><tspan fill="#52514e">  scripted control</tspan></text>
+<rect x="456" y="179" width="196" height="25" rx="6" fill="#fcfcfb" stroke="#e1e0d9"/>
+<circle cx="470.0" cy="191.5" r="5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<text x="482.0" y="196.0" font-size="12"><tspan fill="#0b0b0b" font-weight="600">V1</tspan><tspan fill="#52514e">  RL policy (PPO)</tspan></text>
+<rect x="456" y="208" width="196" height="25" rx="6" fill="#fcfcfb" stroke="#e1e0d9"/>
+<circle cx="470.0" cy="220.5" r="5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<text x="482.0" y="225.0" font-size="12"><tspan fill="#0b0b0b" font-weight="600">V2</tspan><tspan fill="#52514e">  predict, then ambush</tspan></text>
+<rect x="456" y="237" width="196" height="25" rx="6" fill="#fcfcfb" stroke="#e1e0d9"/>
+<circle cx="470.0" cy="249.5" r="5" fill="#1baf7a" stroke="#fcfcfb" stroke-width="2"/>
+<text x="482.0" y="254.0" font-size="12"><tspan fill="#0b0b0b" font-weight="600">V2+</tspan><tspan fill="#52514e">  adaptive options</tspan></text>
+<rect x="698" y="124" width="158" height="120" rx="10" fill="#ffffff" stroke="#c3c2b7"/>
+<text x="712.0" y="148.0" font-size="13.5" fill="#0b0b0b" font-weight="600">Zombies</text>
+<text x="712.0" y="165.0" font-size="11.5" fill="#898781">Squad · EnemyOrder</text>
+<text x="712.0" y="186.0" font-size="12" fill="#52514e">orders: MoveTo,</text>
+<text x="712.0" y="203.0" font-size="12" fill="#52514e">HoldAt, Chase</text>
+<text x="712.0" y="220.0" font-size="12" fill="#52514e">speed 3 (player 5)</text>
+<line x1="170.0" y1="184.0" x2="203.0" y2="184.0" stroke="#52514e" stroke-width="1.5" marker-end="url(#arrow)"/>
+<line x1="410.0" y1="184.0" x2="443.0" y2="184.0" stroke="#52514e" stroke-width="1.5" marker-end="url(#arrow)"/>
+<line x1="664.0" y1="184.0" x2="697.0" y2="184.0" stroke="#52514e" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="204" y="306" width="206" height="62" rx="10" fill="#ffffff" stroke="#c3c2b7"/>
+<text x="218.0" y="330.0" font-size="13.5" fill="#0b0b0b" font-weight="600">Telemetry</text>
+<text x="218.0" y="351.0" font-size="12" fill="#52514e">samples.csv · events.jsonl</text>
+<rect x="444" y="306" width="220" height="62" rx="10" fill="#ffffff" stroke="#c3c2b7"/>
+<text x="458.0" y="330.0" font-size="13.5" fill="#0b0b0b" font-weight="600">MLTraining/  (offline)</text>
+<text x="458.0" y="351.0" font-size="12" fill="#52514e">PPO · predictor · evaluation</text>
+<line x1="307.0" y1="244.0" x2="307.0" y2="305.0" stroke="#52514e" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text x="315.0" y="279.0" font-size="11.5" fill="#898781">logged</text>
+<line x1="410.0" y1="337.0" x2="443.0" y2="337.0" stroke="#52514e" stroke-width="1.5" marker-end="url(#arrow)"/>
+<line x1="600.0" y1="306.0" x2="600.0" y2="271.0" stroke="#52514e" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text x="610.0" y="293.0" font-size="11.5" fill="#898781">trained models (.onnx, .json)</text>
+<text x="698.0" y="322.0" font-size="11.5" fill="#898781">In the ML arena this loop</text>
+<text x="698.0" y="338.0" font-size="11.5" fill="#898781">runs 8× in parallel,</text>
+<text x="698.0" y="354.0" font-size="11.5" fill="#898781">headless, 25–37× faster.</text>
+</svg>

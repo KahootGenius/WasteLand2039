@@ -38,6 +38,9 @@ public class PlayerController : MonoBehaviour, IDamageable
     // 控制状态
     private bool isControlEnabled = true;
     public bool IsControlEnabled => isControlEnabled;
+
+    /// <summary>输入来源（实验分支，训练场的机器人使用）；为空时读取键盘（原版行为）</summary>
+    public IPlayerInput InputOverride { get; set; }
     
     // 血量系统相关
     private bool isDead = false;
@@ -111,9 +114,12 @@ public class PlayerController : MonoBehaviour, IDamageable
             return;
         }
         
-        // 获取移动输入
-        float moveX = Input.GetAxisRaw("Horizontal");
-        float moveY = Input.GetAxisRaw("Vertical");
+        // 获取移动输入（设置了 InputOverride 时由其提供）
+        Vector2 rawInput = InputOverride != null
+            ? InputOverride.Move
+            : new Vector2(Input.GetAxisRaw("Horizontal"), Input.GetAxisRaw("Vertical"));
+        float moveX = rawInput.x;
+        float moveY = rawInput.y;
         
         // 计算移动方向
         moveDirection = new Vector2(moveX, moveY).normalized;

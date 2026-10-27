@@ -1,0 +1,44 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7b5c7ec8888094c13909138391e081a7, type: 3}
+  m_Name: ArenaWave
+  m_EditorClassIdentifier: 
+  hordeName: ML Arena Wave
+  description: "ML \u8BAD\u7EC3\u573A\u7684\u5C38\u6F6E\uFF1A\u53C2\u6570\u590D\u5236\u81EA
+    Day 3\uFF0C\u654C\u4EBA\u4E3A\u4E0D\u6389\u843D\u7269\u54C1\u7684 Zombie_Arena"
+  totalEnemyCount: 20
+  maxActiveEnemies: 5
+  spawnInterval: 2
+  spawnRadius: 15
+  minSpawnDistance: 5
+  enemyTypes:
+  - enemyPrefab: {fileID: 1294821842733686786, guid: 40a23aab27bfb48aea424db986dedc95, type: 3}
+    weight: 1
+    minCount: 0
+    maxCount: 0
+  hordeDuration: 60
+  useDurationLimit: 1
+  requireAllEnemiesKilled: 0
+  experienceReward: 0
+  goldReward: 0
+  itemRewards: []
+  startSound: {fileID: 0}
+  endSound: {fileID: 0}
+  warningSound: {fileID: 0}
+  warningTime: 3
+  startEffect: {fileID: 0}
+  endEffect: {fileID: 0}
+  warningEffect: {fileID: 0}
+  healthMultiplier: 1.05
+  speedMultiplier: 1
+  damageMultiplier: 1
+  hasSpecialEffects: 0

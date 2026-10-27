@@ -1,0 +1,65 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="880" height="418" viewBox="0 0 880 418" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif" role="img" aria-labelledby="title desc">
+<title id="title">Pressure versus anticipation</title>
+<desc id="desc">Two scatter plots (RunnerA, RunnerB80). x: share of flee decisions with a zombie already on the bot's chosen route; y: player damage per wave. V1 points sit high and left (lethal, no anticipation), V2 points sit low and right (on the route, near-baseline damage).</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,1 L9,5 L0,9 z" fill="#52514e"/></marker></defs>
+<rect x="0.5" y="0.5" width="879" height="417" rx="12" fill="#fcfcfb" stroke="#e1e0d9"/>
+<text x="24.0" y="34.0" font-size="17" fill="#0b0b0b" font-weight="600">V1 learned pressure, V2 learned the route</text>
+<text x="24.0" y="55.0" font-size="12.5" fill="#52514e">Phase 5 evaluation, one point per commander. x: flee decisions where a zombie was already on the route</text>
+<text x="24.0" y="73.0" font-size="12.5" fill="#52514e">the bot then took (bot outside that sector). y: damage the player took per wave.</text>
+<circle cx="29.0" cy="104.5" r="5" fill="#898781" stroke="#fcfcfb" stroke-width="2"/>
+<text x="40.0" y="108.0" font-size="12" fill="#52514e">Baseline</text>
+<circle cx="122.2" cy="104.5" r="5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<text x="133.2" y="108.0" font-size="12" fill="#52514e">V1 · RL (PPO)</text>
+<circle cx="247.4" cy="104.5" r="5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<text x="258.4" y="108.0" font-size="12" fill="#52514e">V2 · Predictive</text>
+<text x="80.0" y="138.0" font-size="13" fill="#0b0b0b" font-weight="600">RunnerA · always flees by route A</text>
+<line x1="80.0" y1="340.0" x2="400.0" y2="340.0" stroke="#c3c2b7" stroke-width="1"/>
+<text x="72.0" y="344.0" font-size="11" fill="#898781" text-anchor="end">0</text>
+<text x="80.0" y="357.0" font-size="11" fill="#898781" text-anchor="middle">0%</text>
+<line x1="80.0" y1="285.7" x2="400.0" y2="285.7" stroke="#e1e0d9" stroke-width="1"/>
+<text x="72.0" y="289.7" font-size="11" fill="#898781" text-anchor="end">20</text>
+<text x="186.7" y="357.0" font-size="11" fill="#898781" text-anchor="middle">20%</text>
+<line x1="80.0" y1="231.4" x2="400.0" y2="231.4" stroke="#e1e0d9" stroke-width="1"/>
+<text x="72.0" y="235.4" font-size="11" fill="#898781" text-anchor="end">40</text>
+<text x="293.3" y="357.0" font-size="11" fill="#898781" text-anchor="middle">40%</text>
+<line x1="80.0" y1="177.1" x2="400.0" y2="177.1" stroke="#e1e0d9" stroke-width="1"/>
+<text x="72.0" y="181.1" font-size="11" fill="#898781" text-anchor="end">60</text>
+<text x="400.0" y="357.0" font-size="11" fill="#898781" text-anchor="middle">60%</text>
+<text x="240.0" y="378.0" font-size="11.5" fill="#52514e" text-anchor="middle">zombie on the chosen route at the flee decision</text>
+<text x="46.0" y="245.0" font-size="11.5" fill="#52514e" text-anchor="middle" transform="rotate(-90 46 245.0)">damage per wave</text>
+<circle cx="85.3" cy="337.3" r="5.5" fill="#898781" stroke="#fcfcfb" stroke-width="2"/>
+<text x="94.3" y="331.3" font-size="11.5" fill="#52514e">Baseline</text>
+<circle cx="101.3" cy="277.6" r="5.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<text x="110.3" y="271.6" font-size="11.5" fill="#52514e">ppo_01</text>
+<circle cx="90.7" cy="288.4" r="5.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<text x="99.7" y="301.4" font-size="11.5" fill="#52514e">ppo_02</text>
+<circle cx="373.3" cy="326.4" r="5.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<text x="382.3" y="330.4" font-size="11.5" fill="#52514e">frequency</text>
+<circle cx="346.7" cy="318.3" r="5.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<text x="340.7" y="307.3" font-size="11.5" fill="#52514e" text-anchor="end">learned</text>
+<text x="516.0" y="138.0" font-size="13" fill="#0b0b0b" font-weight="600">RunnerB80 · flees by route B 80% of the time</text>
+<line x1="516.0" y1="340.0" x2="836.0" y2="340.0" stroke="#c3c2b7" stroke-width="1"/>
+<text x="508.0" y="344.0" font-size="11" fill="#898781" text-anchor="end">0</text>
+<text x="516.0" y="357.0" font-size="11" fill="#898781" text-anchor="middle">0%</text>
+<line x1="516.0" y1="285.7" x2="836.0" y2="285.7" stroke="#e1e0d9" stroke-width="1"/>
+<text x="508.0" y="289.7" font-size="11" fill="#898781" text-anchor="end">20</text>
+<text x="622.7" y="357.0" font-size="11" fill="#898781" text-anchor="middle">20%</text>
+<line x1="516.0" y1="231.4" x2="836.0" y2="231.4" stroke="#e1e0d9" stroke-width="1"/>
+<text x="508.0" y="235.4" font-size="11" fill="#898781" text-anchor="end">40</text>
+<text x="729.3" y="357.0" font-size="11" fill="#898781" text-anchor="middle">40%</text>
+<line x1="516.0" y1="177.1" x2="836.0" y2="177.1" stroke="#e1e0d9" stroke-width="1"/>
+<text x="508.0" y="181.1" font-size="11" fill="#898781" text-anchor="end">60</text>
+<text x="836.0" y="357.0" font-size="11" fill="#898781" text-anchor="middle">60%</text>
+<text x="676.0" y="378.0" font-size="11.5" fill="#52514e" text-anchor="middle">zombie on the chosen route at the flee decision</text>
+<text x="482.0" y="245.0" font-size="11.5" fill="#52514e" text-anchor="middle" transform="rotate(-90 482 245.0)">damage per wave</text>
+<circle cx="532.0" cy="312.9" r="5.5" fill="#898781" stroke="#fcfcfb" stroke-width="2"/>
+<text x="541.0" y="306.9" font-size="11.5" fill="#52514e">Baseline</text>
+<circle cx="558.7" cy="174.4" r="5.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<text x="567.7" y="178.4" font-size="11.5" fill="#52514e">ppo_01</text>
+<circle cx="553.3" cy="223.3" r="5.5" fill="#eb6834" stroke="#fcfcfb" stroke-width="2"/>
+<text x="562.3" y="227.3" font-size="11.5" fill="#52514e">ppo_02</text>
+<circle cx="692.0" cy="277.6" r="5.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<text x="701.0" y="271.6" font-size="11.5" fill="#52514e">frequency</text>
+<circle cx="676.0" cy="299.3" r="5.5" fill="#2a78d6" stroke="#fcfcfb" stroke-width="2"/>
+<text x="685.0" y="311.3" font-size="11.5" fill="#52514e">learned</text>
+</svg>

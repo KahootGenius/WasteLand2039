@@ -2,7 +2,7 @@ using UnityEngine;
 using System.Collections.Generic;
 using System.Collections;
 
-public class Enemy : MonoBehaviour, IDamageable
+public partial class Enemy : MonoBehaviour, IDamageable // 命令扩展见 EnemyAI/Orders/Enemy.Orders.cs
 {
     [Header("敌人类型设置")]
     [SerializeField] private bool isMovingEnemy = true; // 是否为会动的敌人
@@ -161,9 +161,9 @@ public class Enemy : MonoBehaviour, IDamageable
         // 如果是移动敌人，启动AI
         if (isMovingEnemy)
         {
-            // 查找玩家和主基地
-            FindPlayer();
-            FindMainBase();
+            // 查找玩家和主基地（已由生成器指定时跳过，见 EnemyAI/Enemy.Targets.cs）
+            if (player == null) FindPlayer();
+            if (mainBase == null) FindMainBase();
             
             // 启动寻路协程
             if (player != null || mainBase != null)
@@ -316,10 +316,11 @@ public class Enemy : MonoBehaviour, IDamageable
         // 首先检测玩家
         DetectPlayer();
         
-        // 如果没有检测到玩家，检测主基地
+        // 如果没有检测到玩家：有位置命令则前往命令位置，否则检测主基地
         if (!isPlayerInRange)
         {
-            DetectMainBase();
+            if (!UpdateOrderTarget())
+                DetectMainBase();
         }
         else
         {
@@ -348,14 +349,14 @@ public class Enemy : MonoBehaviour, IDamageable
         bool wasInRange = isPlayerInRange;
         
         // 检查是否在检测范围内
-        isPlayerInRange = distanceToPlayer <= detectionRadius;
+        isPlayerInRange = distanceToPlayer <= EffectiveDetectionRadius(); // 无命令时即 detectionRadius
         
         // 如果玩家进入或离开范围，更新目标
         if (isPlayerInRange != wasInRange)
         {
             if (isPlayerInRange)
             {
-                currentTarget = player.position;
+                currentTarget = ChasePoint(); // 玩家的位置；截击时为相遇点（Enemy.Interception.cs）
                 hasTarget = true;
                 targetingMainBase = false; // 停止攻击基地
                 
@@ -369,8 +370,8 @@ public class Enemy : MonoBehaviour, IDamageable
             }
             else
             {
-                // 玩家离开范围，检查是否应该攻击基地
-                if (!CheckForMainBaseTarget())
+                // 玩家离开范围：有位置命令则返回命令位置，否则检查是否应该攻击基地
+                if (!TryResumeOrder() && !CheckForMainBaseTarget())
                 {
                     hasTarget = false;
                     isAlerted = false; // 重置警戒状态
@@ -390,7 +391,7 @@ public class Enemy : MonoBehaviour, IDamageable
         // 如果玩家在范围内，持续更新目标位置
         if (isPlayerInRange)
         {
-            currentTarget = player.position;
+            currentTarget = ChasePoint();
             hasTarget = true;
         }
     }
@@ -468,7 +469,11 @@ public class Enemy : MonoBehaviour, IDamageable
                 // 确定目标位置（玩家优先）
                 if (isPlayerInRange && player != null)
                 {
-                    targetPosition = player.position;
+                    targetPosition = ChasePoint(); // 截击时为相遇点（Enemy.Interception.cs）
+                }
+                else if (TryGetOrderDestination(out Vector2 orderDestination))
+                {
+                    targetPosition = orderDestination;
                 }
                 else if (targetingMainBase && mainBase != null)
                 {
@@ -664,7 +669,7 @@ public class Enemy : MonoBehaviour, IDamageable
     /// </summary>
     private void CheckIfStuck()
     {
-        if (!hasTarget || (!isPlayerInRange && !targetingMainBase))
+        if (!hasTarget || (!isPlayerInRange && !targetingMainBase && !IsTravelingToOrder))
         {
             stuckTimer = 0f;
             return;
@@ -679,7 +684,7 @@ public class Enemy : MonoBehaviour, IDamageable
             if (stuckTimer >= stuckTime)
             {
                 // 尝试脱困移动
-                if ((isPlayerInRange && player != null) || (targetingMainBase && mainBase != null))
+                if ((isPlayerInRange && player != null) || (targetingMainBase && mainBase != null) || IsTravelingToOrder)
                 {
                     Vector2 randomDirection = Random.insideUnitCircle.normalized;
                     currentTarget = (Vector2)transform.position + randomDirection * 2f;
@@ -959,7 +964,7 @@ public class Enemy : MonoBehaviour, IDamageable
         isAlerted = true;
         currentPropagationLevel = propagationLevel;
         hasTarget = true;
-        currentTarget = player.position;
+        currentTarget = ChasePoint(); // 截击时为相遇点（Enemy.Interception.cs）
         
         VerboseLog.Log($"{gameObject.name} 加入集群追击，传播层级: {propagationLevel}");
         
