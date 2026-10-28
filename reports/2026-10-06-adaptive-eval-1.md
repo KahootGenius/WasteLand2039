@@ -2,7 +2,8 @@
 
 Batch folder: `MLTraining/results/adaptive_eval/20261006_193654/` (`report.md` has every table). Run log:
 `MLTraining/results/adaptive_eval/run_20261006_193404.log`. Branch `adaptive-horde`, uncommitted code as of that evening.
-The code was written by Claude at Lawrence's request (see IDEAS.md, Active work).
+The adaptive-horde code tested in this run (the ambush bandit, Thompson direction sampling and the adaptive modes in
+`PredictiveCommander`) is Lawrence's; §10 of `2026-10-08-adaptive-horde-writeup.md` sets out who wrote what.
 
 ## Setup checks
 
